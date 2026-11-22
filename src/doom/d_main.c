@@ -544,6 +544,13 @@ void D_DoomLoop (void)
     I_SetGrabMouseCallback(D_GrabMouseCallback);
 #endif
     I_InitGraphics();
+#if PICO_BLUETOOTH_INPUT
+    {
+        // after sound and graphics (and so core 1) are up, as the radio driver claims any free PIO / DMA
+        extern void I_BluetoothInit(void);
+        I_BluetoothInit();
+    }
+#endif
 #if USB_SUPPORT
     printf("Sleeping 2s for USB devices\n"); // TinyUSB still grinds to a halt during connect/disconnect
     absolute_time_t end_time = make_timeout_time_ms(2000);

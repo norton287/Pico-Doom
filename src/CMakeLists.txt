@@ -469,6 +469,39 @@ if (TARGET chocolate-doom)
     )
 endif()
 
+set(DOOM_PICO_SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/pico)
+# WAD data to bundle into "<target>_wad.uf2" next to the plain program UF2 (so a single drag & drop installs
+# both). The super-tiny targets use WHX (doom1.whx, the shareware WAD, ships with this repo); the "nost" targets
+# use WHD, e.g. made from doom.wad / doom2.wad with "whd_gen <wad> <whd> -no-super-tiny".
+set(DOOM_BUNDLE_WHX "${CMAKE_CURRENT_LIST_DIR}/../doom1.whx" CACHE FILEPATH "WHX to bundle with the super-tiny builds (empty for none)")
+set(DOOM_BUNDLE_WHD "" CACHE FILEPATH "WHD to bundle with the _nost builds (empty for none)")
+if (PICO_ON_DEVICE)
+    find_package(Python3 COMPONENTS Interpreter)
+endif()
+
+# The WHX/WHD file is flashed separately at a fixed address after the program; make sure they never overlap
+function(set_doom_tiny_wad_addr TARGET ADDR WAD_FILE)
+    target_compile_definitions(${TARGET} PRIVATE TINY_WAD_ADDR=${ADDR})
+    if (PICO_ON_DEVICE)
+        target_link_options(${TARGET} PRIVATE "LINKER:--defsym=DOOM_WAD_ADDR=${ADDR}" "${DOOM_PICO_SRC_DIR}/wad_addr_check.ld")
+        if (WAD_FILE AND EXISTS "${WAD_FILE}" AND Python3_Interpreter_FOUND)
+            add_custom_command(TARGET ${TARGET} POST_BUILD
+                    COMMAND Python3::Interpreter "${DOOM_PICO_SRC_DIR}/../../tools/uf2_add_data.py"
+                            "$<TARGET_FILE_DIR:${TARGET}>/${TARGET}.uf2" "${WAD_FILE}" ${ADDR}
+                            "$<TARGET_FILE_DIR:${TARGET}>/${TARGET}_wad.uf2"
+                    VERBATIM)
+        endif()
+    endif()
+endfunction()
+
+# core 1's stack lives in the 4K SCRATCH_X bank alongside VGA scanline code; the LCD builds don't put
+# their scanline code there, so give core 1 (which also takes the LCD interrupts) more headroom
+if (DOOM_DISPLAY_IS_LCD)
+    set(DOOM_CORE1_STACK_SIZE 0xc00)
+else()
+    set(DOOM_CORE1_STACK_SIZE 0x4f8)
+endif()
+
 function(add_doom_tiny SUFFIX RENDER_LIB)
     add_executable(doom_tiny${SUFFIX})
     target_link_libraries(doom_tiny${SUFFIX} PRIVATE game)
@@ -500,9 +533,10 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
 
         #NO_DRAW_MENU=1
         # SDK minimilization
-        PICO_TIME_DEFAULT_ALARM_POOL_DISABLED=1
-        PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS=1
-        PICO_DISABLE_SHARED_IRQ_HANDLERS=1
+        # (the Bluetooth build needs the default alarm pool and shared IRQ handlers, for BTstack / cyw43)
+        $<$<NOT:$<BOOL:${DOOM_TINY_BLUETOOTH}>>:PICO_TIME_DEFAULT_ALARM_POOL_DISABLED=1>
+        $<$<NOT:$<BOOL:${DOOM_TINY_BLUETOOTH}>>:PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS=1>
+        $<$<NOT:$<BOOL:${DOOM_TINY_BLUETOOTH}>>:PICO_DISABLE_SHARED_IRQ_HANDLERS=1>
         PICO_USE_OPTIMISTIC_SBRK=1
 
         # MUSIC
@@ -511,10 +545,7 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
 
         NO_USE_NET=1 # standard networking
         USE_PICO_NET=1
-        # for vgaboard
         PICO_DEFAULT_I2C=1
-        PICO_DEFAULT_I2C_SDA_PIN=18
-        PICO_DEFAULT_I2C_SCL_PIN=19
 
         #NO_USE_LOAD=1
         #NO_USE_SAVE=1
@@ -566,7 +597,7 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
         PICO_DEBUG_MALLOC=1
         EMU8950_NO_RATECONV=1
 
-        PICO_CORE1_STACK_SIZE=0x4f8
+        PICO_CORE1_STACK_SIZE=${DOOM_CORE1_STACK_SIZE}
 
         NO_IERROR=1
     )
@@ -581,6 +612,52 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
         target_compile_options(doom_tiny${SUFFIX} PRIVATE -g)
     endif()
     target_link_libraries(doom_tiny${SUFFIX} PRIVATE ${RENDER_LIB})
+    if (PICO_SDK)
+        if (DOOM_DISPLAY_IS_LCD)
+            # Pimoroni Pico Display Pack: LCD on GP16-20, buttons on GP12-15, so I2C networking moves to GP2/GP3
+            target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+                    PICO_DEFAULT_I2C_SDA_PIN=2
+                    PICO_DEFAULT_I2C_SCL_PIN=3
+                    LCD_PIN_DC=16
+                    LCD_PIN_CS=17
+                    LCD_PIN_SCK=18
+                    LCD_PIN_MOSI=19
+                    LCD_PIN_BL=20
+                    BUTTON_PIN_A=12
+                    BUTTON_PIN_B=13
+                    BUTTON_PIN_X=14
+                    BUTTON_PIN_Y=15
+                    LCD_SPI_HZ=${DOOM_LCD_SPI_HZ}
+                    LCD_ASPECT_CORRECT=$<BOOL:${DOOM_LCD_ASPECT_CORRECT}>
+                    LCD_ROTATE_180=$<BOOL:${DOOM_LCD_ROTATE_180}>
+            )
+            if (DOOM_DISPLAY STREQUAL "PIMORONI_DISPLAY_28")
+                # the 2.8" pack's RGB LED sits on GP26-28 where I2S audio normally lives, so move audio to GP9-11
+                target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+                        LCD_PIN_LED_R=26
+                        LCD_PIN_LED_G=27
+                        LCD_PIN_LED_B=28
+                        PICO_AUDIO_I2S_DATA_PIN=9
+                        PICO_AUDIO_I2S_CLOCK_PIN_BASE=10
+                )
+            else()
+                target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+                        LCD_PIN_LED_R=6
+                        LCD_PIN_LED_G=7
+                        LCD_PIN_LED_B=8
+                        # same I2S pins as the original vgaboard builds
+                        PICO_AUDIO_I2S_DATA_PIN=26
+                        PICO_AUDIO_I2S_CLOCK_PIN_BASE=27
+                )
+            endif()
+        else()
+            # vgaboard
+            target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+                    PICO_DEFAULT_I2C_SDA_PIN=18
+                    PICO_DEFAULT_I2C_SCL_PIN=19
+            )
+        endif()
+    endif()
     set(PICO_HACK 0)
     set(STAMP_HACK 0)
     if (PICO_HACK)
@@ -635,30 +712,67 @@ if (PICO_SDK)
             NO_USE_FINALE_CAST=1
             NO_USE_FINALE_BUNNY=1
     )
-    target_compile_definitions(doom_tiny PRIVATE
-            TINY_WAD_ADDR=0x10040000
-    )
+    set_doom_tiny_wad_addr(doom_tiny 0x10040000 "${DOOM_BUNDLE_WHX}")
     target_link_libraries(doom_tiny PRIVATE tiny_settings)
     add_doom_tiny(_nost render_newhope)
 
-    target_compile_definitions(doom_tiny_nost PRIVATE
-            # NO_USE_FINALE_CAST=1 # note this is only used by doom II but doesnt take that much more space
-            TINY_WAD_ADDR=0x10048000
-            )
+    # target_compile_definitions(doom_tiny_nost PRIVATE NO_USE_FINALE_CAST=1) # only used by doom II but doesnt take that much more space
+    set_doom_tiny_wad_addr(doom_tiny_nost 0x10048000 "${DOOM_BUNDLE_WHD}")
     if (PICO_ON_DEVICE)
         suppress_tinyusb_warnings()
         add_doom_tiny(_usb render_newhope)
         target_link_libraries(doom_tiny_usb PRIVATE tiny_settings pico_cd)
         target_compile_definitions(doom_tiny_usb PRIVATE
                 USB_SUPPORT=1
-                TINY_WAD_ADDR=0x10042000 # ugh tinyusb is >8K currently!!
         )
+        set_doom_tiny_wad_addr(doom_tiny_usb 0x10043000 "${DOOM_BUNDLE_WHX}") # TinyUSB adds >8K (was 0x10042000, which the current SDK overflows)
         add_doom_tiny(_nost_usb render_newhope)
         target_link_libraries(doom_tiny_nost_usb PRIVATE pico_cd)
         target_compile_definitions(doom_tiny_nost_usb PRIVATE
                 USB_SUPPORT=1
-                TINY_WAD_ADDR=0x10048000
                 )
+        set_doom_tiny_wad_addr(doom_tiny_nost_usb 0x10048000 "${DOOM_BUNDLE_WHD}")
+    endif()
+
+    if (DOOM_BLUETOOTH)
+        # doom_tiny_bt: doom_tiny (DOOM1.WAD as WHX) + Bluetooth gamepads via Bluepad32, for the Pico 2 W
+        if (NOT DOOM_DISPLAY_IS_LCD)
+            message(FATAL_ERROR "DOOM_BLUETOOTH currently requires a Display Pack build (DOOM_DISPLAY=PIMORONI_DISPLAY_2/28)")
+        endif()
+        if (NOT BLUEPAD32_ROOT)
+            include(FetchContent)
+            FetchContent_Declare(bluepad32
+                    GIT_REPOSITORY https://github.com/ricardoquesada/bluepad32.git
+                    GIT_TAG 80d6314e46f871719fbb4b721a2cc02227c4f369 # 5.0.0-beta0, tested
+                    GIT_SUBMODULES "" # we use the BTstack bundled with the Pico SDK
+            )
+            FetchContent_GetProperties(bluepad32)
+            if (NOT bluepad32_POPULATED)
+                message("Downloading Bluepad32")
+                FetchContent_Populate(bluepad32)
+            endif()
+            set(BLUEPAD32_ROOT ${bluepad32_SOURCE_DIR})
+        endif()
+        set(BLUEPAD32_ROOT ${BLUEPAD32_ROOT} CACHE PATH "Path to Bluepad32" FORCE)
+        # btstack_config.h / sdkconfig.h, needed by BTstack and libbluepad32 as well as us
+        include_directories(${CMAKE_CURRENT_LIST_DIR}/pico/bt ${PICO_SDK_PATH}/lib/btstack/src)
+        # the sys clock is overclocked to 270MHz: slow the cyw43 SPI down to ~34MHz
+        add_compile_definitions(CYW43_PIO_CLOCK_DIV_INT=4 CYW43_PIO_CLOCK_DIV_FRAC8=0)
+        add_subdirectory(${BLUEPAD32_ROOT}/src/components/bluepad32 libbluepad32)
+
+        set(DOOM_TINY_BLUETOOTH 1)
+        add_doom_tiny(_bt render_newhope)
+        set(DOOM_TINY_BLUETOOTH 0)
+        target_sources(doom_tiny_bt PRIVATE pico/i_bluetooth.c)
+        target_include_directories(doom_tiny_bt PRIVATE ${BLUEPAD32_ROOT}/src/components/bluepad32/include)
+        target_link_libraries(doom_tiny_bt PRIVATE tiny_settings bluepad32 pico_cyw43_arch_none pico_btstack_classic pico_btstack_ble pico_btstack_cyw43)
+        target_compile_definitions(doom_tiny_bt PRIVATE
+                PICO_BLUETOOTH_INPUT=1
+                # BTstack's pairing keys: the 8K below the last 4K sector of flash (RP2350 default) - keep saves clear
+                DOOM_FLASH_RESERVED_TOP=12288
+        )
+        # Bluetooth + the cyw43 firmware are ~500K, so the WHX moves up (Pico 2 W has 4MB)
+        set_doom_tiny_wad_addr(doom_tiny_bt 0x10100000 "${DOOM_BUNDLE_WHX}")
     endif()
 endif()
 

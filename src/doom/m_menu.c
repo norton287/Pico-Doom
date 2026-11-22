@@ -822,6 +822,12 @@ static void SetDefaultSaveName(int slot)
                    "%s: %s", W_WadNameForLump(maplumpinfo),
                    maplumpinfo->name);
     }
+#elif PICO_BUTTON_INPUT
+    // name the save after the current level, e.g. "E1M3" or "MAP07"
+    if (gamemode == commercial)
+        M_snprintf(savegamestrings[itemOn], SAVESTRINGSIZE, "MAP%02d", gamemap);
+    else
+        M_snprintf(savegamestrings[itemOn], SAVESTRINGSIZE, "E%dM%d", gameepisode, gamemap);
 #else
     strcpy(savegamestrings[itemOn], "TEST");
 #endif
@@ -850,6 +856,10 @@ void M_SaveSelect(int choice)
     {
         savegamestrings[choice][0] = 0;
 
+#if PICO_BUTTON_INPUT
+        // with only buttons there is no way to type a name, so always fill in a default one
+        joypadSave = true;
+#endif
         if (joypadSave)
         {
             SetDefaultSaveName(choice);

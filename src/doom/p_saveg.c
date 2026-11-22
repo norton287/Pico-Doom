@@ -2653,6 +2653,10 @@ const uint8_t *get_end_of_flash(void) {
                 break;
             }
         }
+#ifdef DOOM_FLASH_RESERVED_TOP
+        // something else (e.g. BTstack's pairing keys) lives at the very top of flash
+        end_of_flash -= DOOM_FLASH_RESERVED_TOP;
+#endif
 //        printf("FLASH SPACE %p -> %p\n", whd_map_base + whdheader->size, end_of_flash);
     }
     return end_of_flash;

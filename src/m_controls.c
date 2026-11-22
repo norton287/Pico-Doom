@@ -129,8 +129,16 @@ key_type_t key_weapon5 = '5';
 key_type_t key_weapon6 = '6';
 key_type_t key_weapon7 = '7';
 key_type_t key_weapon8 = '8';
+#if PICO_BUTTON_INPUT
+key_type_t key_prevweapon = '['; // posted by the Bluetooth gamepad's LB
+#else
 key_type_t key_prevweapon = 0;
+#endif
+#if PICO_BUTTON_INPUT
+key_type_t key_nextweapon = ']'; // posted by the Display Pack button chord A+X+Y
+#else
 key_type_t key_nextweapon = 0;
+#endif
 
 // Map control keys:
 

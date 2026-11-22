@@ -1,0 +1,19 @@
+;
+; Copyright (c) 2024 RP2040 Doom contributors
+;
+; SPDX-License-Identifier: BSD-3-Clause
+;
+; Write-only SPI (mode 0) transmitter for ST7789 panels.
+; One data bit is shifted out per two state machine cycles: data changes while
+; SCK is low and is latched by the panel on the rising edge.
+;
+; Bits are taken MSB first from the OSR with autopull; the pull threshold is
+; configured to 8 (commands during init) or 16 (RGB565 pixels).
+
+.program st7789_lcd
+.side_set 1
+
+.wrap_target
+    out pins, 1   side 0
+    nop           side 1
+.wrap

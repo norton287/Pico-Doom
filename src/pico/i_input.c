@@ -33,6 +33,9 @@
 #include "m_config.h"
 #include "hardware/uart.h"
 #include <stdlib.h>
+#if PICO_BUTTON_INPUT
+#include "i_buttons.h"
+#endif
 #if USB_SUPPORT
 #include "pico/binary_info.h"
 #include "tusb.h"
@@ -512,6 +515,9 @@ static void pico_quit(void) {
 #endif
 
 void I_InputInit(void) {
+#if PICO_BUTTON_INPUT
+    I_ButtonsInit();
+#endif
 #if PICO_NO_HARDWARE
     platform_key_down = pico_key_down;
     platform_key_up = pico_key_up;
@@ -530,6 +536,9 @@ void I_GetEvent() {
 }
 
 void I_GetEventTimeout(int key_timeout) {
+#if PICO_BUTTON_INPUT
+    I_ButtonsPoll();
+#endif
 #if PICO_ON_DEVICE && !NO_USE_UART
     if (uart_is_readable(uart_default)) {
         char c = uart_getc(uart_default);

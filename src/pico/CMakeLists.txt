@@ -34,12 +34,39 @@ target_compile_definitions(common_pico INTERFACE
         NO_USE_MOUSE=1
         PICO_AUDIO_I2S_PIO=1
         PICO_AUDIO_I2S_DMA_IRQ=1
-        PICO_USE_SW_SPIN_LOCKS=0
         PICO_USE_STACK_GUARDS=0 # todo we can actually use these sensibly, but right now we do overflow!
 )
+if (PICO_RP2040)
+    # hardware spin locks are fine (and faster) on RP2040; on RP2350 erratum E2 means the SDK (and pico-extras)
+    # require the default software spin locks
+    target_compile_definitions(common_pico INTERFACE PICO_USE_SW_SPIN_LOCKS=0)
+endif()
 
-pico_generate_pio_header(common_pico ${CMAKE_CURRENT_LIST_DIR}/video_doom.pio)
-target_link_libraries(common_pico INTERFACE pico_stdlib pico_multicore pico_scanvideo_dpi)
+target_link_libraries(common_pico INTERFACE pico_stdlib pico_multicore)
+
+if (DOOM_DISPLAY_IS_LCD)
+    # ST7789 SPI LCD + A/B/X/Y buttons (Pimoroni Pico Display Pack 2.0 / 2.8)
+    if (NOT PICO_ON_DEVICE)
+        message(FATAL_ERROR "DOOM_DISPLAY=${DOOM_DISPLAY} is only supported for on-device builds")
+    endif()
+    target_sources(common_pico INTERFACE
+            ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.c
+            ${CMAKE_CURRENT_LIST_DIR}/i_buttons.c
+    )
+    pico_generate_pio_header(common_pico ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.pio)
+    target_compile_definitions(common_pico INTERFACE
+            PICO_DOOM_LCD=1
+            PICO_BUTTON_INPUT=1
+    )
+    option(DOOM_BUTTON_DEBUG "Draw raw button / chord state in the top right corner of the LCD" OFF)
+    if (DOOM_BUTTON_DEBUG)
+        target_compile_definitions(common_pico INTERFACE DOOM_BUTTON_DEBUG=1)
+    endif()
+    target_link_libraries(common_pico INTERFACE hardware_pio hardware_dma)
+else()
+    pico_generate_pio_header(common_pico ${CMAKE_CURRENT_LIST_DIR}/video_doom.pio)
+    target_link_libraries(common_pico INTERFACE pico_scanvideo_dpi)
+endif()
 
 add_library(pico_cd INTERFACE)
 if (TARGET tinyusb_host)

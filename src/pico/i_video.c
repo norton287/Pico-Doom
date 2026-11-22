@@ -43,14 +43,28 @@
 #include "w_wad.h"
 #include "z_zone.h"
 
+#if PICO_DOOM_LCD
+#include "st7789_lcd.h"
+#if PICO_BUTTON_INPUT
+#include "i_buttons.h"
+#include "hardware/structs/sio.h"
+#endif
+#include "hardware/irq.h"
+#include "hardware/sync.h"
+#define VIDEO_PIXEL_FROM_RGB8 LCD_PIXEL_FROM_RGB8
+#else
 #include "pico/scanvideo.h"
 #include "pico/scanvideo/composable_scanline.h"
+#define VIDEO_PIXEL_FROM_RGB8 PICO_SCANVIDEO_PIXEL_FROM_RGB8
+#endif
 #include "pico/multicore.h"
 #include "pico/sync.h"
 #include "pico/time.h"
 #include "hardware/gpio.h"
 #include "picodoom.h"
+#if !PICO_DOOM_LCD
 #include "video_doom.pio.h"
+#endif
 #include "image_decoder.h"
 #if PICO_ON_DEVICE
 #include "hardware/dma.h"
@@ -70,22 +84,22 @@ typedef struct __packed {
 #include "fonts/normal.h"
 
 static uint16_t ega_colors[] = {
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x00, 0x00, 0x00),         // 0: Black
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x00, 0x00, 0xa8),         // 1: Blue
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x00, 0xa8, 0x00),         // 2: Green
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x00, 0xa8, 0xa8),         // 3: Cyan
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xa8, 0x00, 0x00),         // 4: Red
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xa8, 0x00, 0xa8),         // 5: Magenta
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xa8, 0x54, 0x00),         // 6: Brown
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xa8, 0xa8, 0xa8),         // 7: Grey
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x54, 0x54, 0x54),         // 8: Dark grey
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x54, 0x54, 0xfe),         // 9: Bright blue
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x54, 0xfe, 0x54),         // 10: Bright green
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0x54, 0xfe, 0xfe),         // 11: Bright cyan
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xfe, 0x54, 0x54),         // 12: Bright red
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xfe, 0x54, 0xfe),         // 13: Bright magenta
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xfe, 0xfe, 0x54),         // 14: Yellow
-    PICO_SCANVIDEO_PIXEL_FROM_RGB8(0xfe, 0xfe, 0xfe),         // 15: Bright white
+    VIDEO_PIXEL_FROM_RGB8(0x00, 0x00, 0x00),         // 0: Black
+    VIDEO_PIXEL_FROM_RGB8(0x00, 0x00, 0xa8),         // 1: Blue
+    VIDEO_PIXEL_FROM_RGB8(0x00, 0xa8, 0x00),         // 2: Green
+    VIDEO_PIXEL_FROM_RGB8(0x00, 0xa8, 0xa8),         // 3: Cyan
+    VIDEO_PIXEL_FROM_RGB8(0xa8, 0x00, 0x00),         // 4: Red
+    VIDEO_PIXEL_FROM_RGB8(0xa8, 0x00, 0xa8),         // 5: Magenta
+    VIDEO_PIXEL_FROM_RGB8(0xa8, 0x54, 0x00),         // 6: Brown
+    VIDEO_PIXEL_FROM_RGB8(0xa8, 0xa8, 0xa8),         // 7: Grey
+    VIDEO_PIXEL_FROM_RGB8(0x54, 0x54, 0x54),         // 8: Dark grey
+    VIDEO_PIXEL_FROM_RGB8(0x54, 0x54, 0xfe),         // 9: Bright blue
+    VIDEO_PIXEL_FROM_RGB8(0x54, 0xfe, 0x54),         // 10: Bright green
+    VIDEO_PIXEL_FROM_RGB8(0x54, 0xfe, 0xfe),         // 11: Bright cyan
+    VIDEO_PIXEL_FROM_RGB8(0xfe, 0x54, 0x54),         // 12: Bright red
+    VIDEO_PIXEL_FROM_RGB8(0xfe, 0x54, 0xfe),         // 13: Bright magenta
+    VIDEO_PIXEL_FROM_RGB8(0xfe, 0xfe, 0x54),         // 14: Yellow
+    VIDEO_PIXEL_FROM_RGB8(0xfe, 0xfe, 0xfe),         // 15: Bright white
 };
 #endif
 
@@ -141,6 +155,7 @@ static uint32_t *text_scanline_buffer_start;
 static uint8_t *text_screen_cpy;
 static uint8_t *text_font_cpy;
 
+#if !PICO_DOOM_LCD
 #if USE_1280x1024x60
 //static uint32_t missing_scanline_data[] = {
 //        video_doom_offset_raw_1p | (0 << 16u),
@@ -150,7 +165,7 @@ static uint8_t *text_font_cpy;
 static uint32_t missing_scanline_data[] =
         {
 #if YELLOW_SUBMARINE
-                video_doom_offset_color_run | (PICO_SCANVIDEO_PIXEL_FROM_RGB8(255,255,0) << 16u),
+                video_doom_offset_color_run | (VIDEO_PIXEL_FROM_RGB8(255,255,0) << 16u),
                 120 | (video_doom_offset_raw_1p << 16u),
 #endif
                 0u | (video_doom_offset_end_of_scanline_ALIGN << 16u)
@@ -241,6 +256,7 @@ const scanvideo_mode_t vga_mode_320x200_60 =
 
 #define VGA_MODE vga_mode_320x200_60
 #endif
+#endif // !PICO_DOOM_LCD
 
 #if USE_INTERP
 static interp_hw_save_t interp0_save, interp1_save;
@@ -384,6 +400,7 @@ static void scanline_func_none(uint32_t *dest, int scanline) {
     memset(dest, 0, SCREENWIDTH * 2);
 }
 
+#if !PICO_DOOM_LCD
 #if SUPPORT_TEXT
 void check_text_buffer(scanvideo_scanline_buffer_t *buffer) {
 #if PICO_ON_DEVICE
@@ -553,6 +570,8 @@ static void __noinline render_text_mode_scanline(scanvideo_scanline_buffer_t *bu
 #endif
 }
 #endif
+
+#endif // !PICO_DOOM_LCD
 
 static void __scratch_x("scanlines") scanline_func_double(uint32_t *dest, int scanline) {
     if (scanline < MAIN_VIEWHEIGHT) {
@@ -857,6 +876,38 @@ static inline uint draw_vpatch(uint16_t *dest, patch_t *patch, vpatchlist_t *vp,
     return data - data0;
 }
 
+// Draw the vpatch overlays (status bar, menus, HUD text, ...) which intersect this scanline on top of
+// the already palette converted pixels in dest
+static __force_inline void draw_scanline_overlays(uint16_t *dest, int scanline) {
+    assert(scanline < count_of(vpatchlists->vpatch_starters));
+    int prev = 0;
+    for (int vp = vpatchlists->vpatch_starters[scanline]; vp;) {
+        int next = vpatchlists->vpatch_next[vp];
+        while (vpatchlists->vpatch_next[prev] && vpatchlists->vpatch_next[prev] < vp) {
+            prev = vpatchlists->vpatch_next[prev];
+        }
+        assert(prev != vp);
+        assert(vpatchlists->vpatch_next[prev] != vp);
+        vpatchlists->vpatch_next[vp] = vpatchlists->vpatch_next[prev];
+        vpatchlists->vpatch_next[prev] = vp;
+        prev = vp;
+        vp = next;
+    }
+    vpatchlist_t *overlays = vpatchlists->overlays[display_overlay_index];
+    prev = 0;
+    for (int vp = vpatchlists->vpatch_next[prev]; vp; vp = vpatchlists->vpatch_next[prev]) {
+        patch_t *patch = resolve_vpatch_handle(overlays[vp].entry.patch_handle);
+        int yoff = scanline - overlays[vp].entry.y;
+        if (yoff < vpatch_height(patch)) {
+            vpatchlists->vpatch_doff[vp] = draw_vpatch(dest, patch, &overlays[vp],
+                                                       vpatchlists->vpatch_doff[vp]);
+            prev = vp;
+        } else {
+            vpatchlists->vpatch_next[prev] = vpatchlists->vpatch_next[vp];
+        }
+    }
+}
+
 // this is not in flash as quite large and only once per frame
 void __noinline new_frame_init_overlays_palette_and_wipe() {
     // re-initialize our overlay drawing
@@ -890,7 +941,7 @@ void __noinline new_frame_init_overlays_palette_and_wipe() {
                         g = gammatable[usegamma-1][g];
                         b = gammatable[usegamma-1][b];
                     }
-                    palette[i] = PICO_SCANVIDEO_PIXEL_FROM_RGB8(r, g, b);
+                    palette[i] = VIDEO_PIXEL_FROM_RGB8(r, g, b);
                 }
             } else {
                 int mul, r0, g0, b0;
@@ -912,7 +963,7 @@ void __noinline new_frame_init_overlays_palette_and_wipe() {
                     r += ((r0 - r) * mul) >> 16;
                     g += ((g0 - g) * mul) >> 16;
                     b += ((b0 - b) * mul) >> 16;
-                    palette[i] = PICO_SCANVIDEO_PIXEL_FROM_RGB8(r, g, b);
+                    palette[i] = VIDEO_PIXEL_FROM_RGB8(r, g, b);
                 }
             }
             next_pal = -1;
@@ -980,6 +1031,203 @@ void __no_inline_not_in_flash_func(new_frame_stuff)() {
     }
 }
 
+#if PICO_DOOM_LCD
+// ---------------------------------------------------------------------------
+// ST7789 SPI LCD output (Pimoroni Pico Display Pack 2.0 / 2.8)
+//
+// Rather than generating scanlines just in time for a VGA beam, core 1 renders
+// each 320 pixel line into a small ring of RGB565 line buffers which a DMA
+// channel streams to the panel via PIO. There is no beam to race, so if the
+// renderer falls behind the panel simply waits.
+//
+// Everything on this path is RAM resident because it keeps running while core 0
+// has flash XIP disabled to write saved games (VIDEO_TYPE_SAVING).
+// ---------------------------------------------------------------------------
+
+// 1: stretch 320x200 to 320x240 (every 5th line doubled) - the 4:3 picture Doom was drawn for
+// 0: show 320x200 1:1 with black bars at top and bottom
+#ifndef LCD_ASPECT_CORRECT
+#define LCD_ASPECT_CORRECT 1
+#endif
+#if LCD_ASPECT_CORRECT
+#define LCD_ROWS 240
+#define LCD_Y0 0
+#else
+#define LCD_ROWS SCREENHEIGHT
+#define LCD_Y0 ((LCD_HEIGHT - SCREENHEIGHT) / 2)
+#endif
+#define LCD_NUM_LINE_BUFFERS 3
+
+#if PICO_RP2350
+#define LCD_FILL_IRQ SPARE_IRQ_0
+#else
+#define LCD_FILL_IRQ 31 // unused IRQ on RP2040, used as a software interrupt
+#endif
+
+static uint32_t lcd_line_buffers[LCD_NUM_LINE_BUFFERS][SCREENWIDTH / 2];
+static uint8_t lcd_line_repeats[LCD_NUM_LINE_BUFFERS];
+static volatile uint8_t lcd_queue_count;  // line buffers queued for/in DMA
+static uint8_t lcd_queue_head;            // next/current buffer to send (DMA IRQ owns)
+static uint8_t lcd_queue_tail;            // next buffer to fill (fill IRQ owns)
+static uint8_t lcd_repeats_left;          // extra sends of the head buffer (DMA IRQ owns)
+static volatile bool lcd_dma_active;
+static bool lcd_in_frame;
+static uint16_t lcd_src_line;
+static uint8_t lcd_line_mod5;
+static uint32_t lcd_frame_number;
+
+static __force_inline void lcd_pend_fill(void) {
+#if !PICO_RP2350
+    *((io_rw_32 *) (PPB_BASE + M0PLUS_NVIC_ISPR_OFFSET)) = 1u << LCD_FILL_IRQ;
+#else
+    nvic_hw->ispr[LCD_FILL_IRQ / 32] = 1u << (LCD_FILL_IRQ % 32);
+#endif
+}
+
+static __force_inline void lcd_start_head(void) {
+    lcd_repeats_left = lcd_line_repeats[lcd_queue_head] - 1;
+    lcd_dma_active = true;
+    lcd_dma_send(lcd_line_buffers[lcd_queue_head], SCREENWIDTH);
+}
+
+static void __not_in_flash_func(lcd_dma_irq_handler)(void) {
+    lcd_dma_ack_irq();
+    if (lcd_repeats_left) {
+        lcd_repeats_left--;
+        lcd_dma_send(lcd_line_buffers[lcd_queue_head], SCREENWIDTH);
+        return;
+    }
+    lcd_queue_head = lcd_queue_head == LCD_NUM_LINE_BUFFERS - 1 ? 0 : lcd_queue_head + 1;
+    if (--lcd_queue_count) {
+        lcd_start_head();
+    } else {
+        lcd_dma_active = false;
+    }
+    lcd_pend_fill();
+}
+
+#if SUPPORT_TEXT
+// The 80x25 text screen (ENDOOM) is 640x400 at 8x16 per character; squash each glyph to 4x8 by OR-ing
+// pixel pairs so that it fits 320x200 whilst keeping thin strokes visible.
+static void lcd_render_text_scanline(uint16_t *d, int scanline) {
+    const uint8_t *text_data = text_screen_data + TXT_SCREEN_W * 2 * (scanline / 8);
+    const uint8_t *font_base = text_font_cpy + (scanline & 7) * 2;
+    uint blink = lcd_frame_number & 16;
+    for (int i = 0; i < TXT_SCREEN_W; i++) {
+        uint fg = text_data[1] & 0xf;
+        uint bg = (text_data[1] >> 4) & 0xf;
+        if (bg & 0x8) {
+            bg &= ~0x8;
+            if (blink) fg = bg;
+        }
+        uint16_t fgc = ega_colors[fg];
+        uint16_t bgc = ega_colors[bg];
+        const uint8_t *glyph = font_base + text_data[0] * 16;
+        uint bits = glyph[0] | glyph[1];
+        bits |= bits >> 1;
+        d[0] = (bits & 0x01) ? fgc : bgc;
+        d[1] = (bits & 0x04) ? fgc : bgc;
+        d[2] = (bits & 0x10) ? fgc : bgc;
+        d[3] = (bits & 0x40) ? fgc : bgc;
+        d += 4;
+        text_data += 2;
+    }
+}
+#endif
+
+static void __not_in_flash_func(lcd_render_scanline)(uint32_t *dest, int scanline) {
+    if (display_video_type == VIDEO_TYPE_TEXT) {
+#if SUPPORT_TEXT
+        if (text_screen_data && text_font_cpy) {
+            lcd_render_text_scanline((uint16_t *) dest, scanline);
+            return;
+        }
+#endif
+        scanline_func_none(dest, scanline);
+        return;
+    }
+    scanline_funcs[display_video_type](dest, scanline);
+    if (display_video_type >= FIRST_VIDEO_TYPE_WITH_OVERLAYS) {
+        draw_scanline_overlays((uint16_t *) dest, scanline);
+    }
+#if DOOM_BUTTON_DEBUG
+    // debug strip, top right: [A][B][X][Y] raw buttons (white = down), [S] shift (green),
+    // [U] colour changes on every "use" tap, [M] on every Esc tap, [P] on every input poll
+    if (scanline >= 2 && scanline < 10) {
+        extern volatile uint8_t button_debug_shift, button_debug_use_count, button_debug_esc_count, button_debug_poll_count;
+        uint8_t raw = (uint8_t) ((((sio_hw->gpio_in >> BUTTON_PIN_A) & 1u) ^ 1u) | ((((sio_hw->gpio_in >> BUTTON_PIN_B) & 1u) ^ 1u) << 1u) |
+                                 ((((sio_hw->gpio_in >> BUTTON_PIN_X) & 1u) ^ 1u) << 2u) | ((((sio_hw->gpio_in >> BUTTON_PIN_Y) & 1u) ^ 1u) << 3u));
+        static const uint16_t cyc[4] = {0xF800, 0xFFE0, 0x001F, 0xF81F};
+        uint16_t box[7];
+        for (int i = 0; i < 4; i++) box[i] = (raw >> i) & 1u ? 0xFFFF : 0x2104;
+        box[4] = button_debug_shift ? 0x07E0 : 0x2104;
+        box[5] = cyc[button_debug_use_count & 3u];
+        box[6] = cyc[button_debug_esc_count & 3u];
+        uint16_t *d = (uint16_t *) dest + SCREENWIDTH - 8 * 8;
+        for (int b = 0; b < 8; b++) {
+            uint16_t c = b < 7 ? box[b] : cyc[button_debug_poll_count & 3u];
+            for (int i = 0; i < 6; i++) d[b * 8 + i] = c;
+            d[b * 8 + 6] = d[b * 8 + 7] = 0;
+        }
+    }
+    // below it, a bar 1 pixel per ms long: the longest gap between the game's input polls in the last second
+    // (green < 50ms, yellow < 150ms, red beyond)
+    if (scanline >= 12 && scanline < 16) {
+        extern volatile uint16_t button_debug_max_poll_gap_ms;
+        uint gap = button_debug_max_poll_gap_ms;
+        uint16_t c = gap < 50 ? 0x07E0 : gap < 150 ? 0xFFE0 : 0xF800;
+        if (gap > SCREENWIDTH) gap = SCREENWIDTH;
+        uint16_t *d = (uint16_t *) dest;
+        for (uint i = 0; i < gap; i++) d[i] = c;
+    }
+#endif
+}
+
+static void __not_in_flash_func(lcd_fill_irq_handler)(void) {
+#if USE_INTERP
+    need_save = interp_in_use;
+    interp_updated = 0;
+#endif
+#if PICO_BUTTON_INPUT
+    // cheap (rate limited to every 2ms); this interrupt runs continuously, so it's a steady sample clock
+    I_ButtonsSample();
+#endif
+    while (lcd_queue_count < LCD_NUM_LINE_BUFFERS) {
+        if (!lcd_in_frame) {
+            // the RAMWR which restarts the frame can't be sent until the previous frame has fully left
+            // the DMA; the DMA IRQ re-pends us when it goes idle
+            if (lcd_dma_active) break;
+            lcd_begin_frame();
+            lcd_frame_number++;
+            new_frame_stuff();
+            lcd_in_frame = true;
+            lcd_src_line = 0;
+            lcd_line_mod5 = 0;
+        }
+        uint8_t idx = lcd_queue_tail;
+        lcd_render_scanline(lcd_line_buffers[idx], lcd_src_line);
+#if LCD_ASPECT_CORRECT
+        // 200 -> 240 rows: every 5th source line is sent twice
+        lcd_line_repeats[idx] = lcd_line_mod5 == 4 ? 2 : 1;
+        lcd_line_mod5 = lcd_line_mod5 == 4 ? 0 : lcd_line_mod5 + 1;
+#else
+        lcd_line_repeats[idx] = 1;
+#endif
+        lcd_queue_tail = idx == LCD_NUM_LINE_BUFFERS - 1 ? 0 : idx + 1;
+        uint32_t save = save_and_disable_interrupts();
+        lcd_queue_count++;
+        if (!lcd_dma_active) lcd_start_head();
+        restore_interrupts(save);
+        if (++lcd_src_line == SCREENHEIGHT) lcd_in_frame = false;
+    }
+#if USE_INTERP
+    if (interp_updated && need_save) {
+        interp_restore_static(interp0, &interp0_save);
+        interp_restore_static(interp1, &interp1_save);
+    }
+#endif
+}
+#else
 void __scratch_x("scanlines") fill_scanlines() {
 #if SUPPORT_TEXT
     struct scanvideo_scanline_buffer *buffer = scanvideo_begin_scanline_generation_linked(display_video_type == VIDEO_TYPE_TEXT ? 2 : 1, false);
@@ -1006,33 +1254,7 @@ void __scratch_x("scanlines") fill_scanlines() {
             assert (buffer->data < text_scanline_buffer_start || buffer->data >= text_scanline_buffer_start + TEXT_SCANLINE_BUFFER_TOTAL_WORDS);
             scanline_funcs[display_video_type](buffer->data+1, scanline);
             if (display_video_type >= FIRST_VIDEO_TYPE_WITH_OVERLAYS) {
-                assert(scanline < count_of(vpatchlists->vpatch_starters));
-                int prev = 0;
-                for (int vp = vpatchlists->vpatch_starters[scanline]; vp;) {
-                    int next = vpatchlists->vpatch_next[vp];
-                    while (vpatchlists->vpatch_next[prev] && vpatchlists->vpatch_next[prev] < vp) {
-                        prev = vpatchlists->vpatch_next[prev];
-                    }
-                    assert(prev != vp);
-                    assert(vpatchlists->vpatch_next[prev] != vp);
-                    vpatchlists->vpatch_next[vp] = vpatchlists->vpatch_next[prev];
-                    vpatchlists->vpatch_next[prev] = vp;
-                    prev = vp;
-                    vp = next;
-                }
-                vpatchlist_t *overlays = vpatchlists->overlays[display_overlay_index];
-                prev = 0;
-                for (int vp = vpatchlists->vpatch_next[prev]; vp; vp = vpatchlists->vpatch_next[prev]) {
-                    patch_t *patch = resolve_vpatch_handle(overlays[vp].entry.patch_handle);
-                    int yoff = scanline - overlays[vp].entry.y;
-                    if (yoff < vpatch_height(patch)) {
-                        vpatchlists->vpatch_doff[vp] = draw_vpatch((uint16_t*)(buffer->data + 1), patch, &overlays[vp],
-                                                                   vpatchlists->vpatch_doff[vp]);
-                        prev = vp;
-                    } else {
-                        vpatchlists->vpatch_next[prev] = vpatchlists->vpatch_next[vp];
-                    }
-                }
+                draw_scanline_overlays((uint16_t *)(buffer->data + 1), scanline);
             }
             uint16_t *p = (uint16_t *) buffer->data;
             p[0] = video_doom_offset_raw_run;
@@ -1069,8 +1291,31 @@ void __scratch_x("scanlines") fill_scanlines() {
     }
 #endif
 }
+#endif // PICO_DOOM_LCD
 #pragma GCC pop_options
 
+#if PICO_DOOM_LCD
+static void core1() {
+#if PICO_BLUETOOTH_INPUT
+    // BTstack (core 0) stores pairing keys with flash_safe_execute, which needs core 1 to park itself in RAM
+    multicore_lockout_victim_init();
+#endif
+    lcd_init(LCD_Y0, LCD_ROWS);
+    // DMA completion must preempt line generation so the panel is kept fed
+    irq_set_exclusive_handler(DMA_IRQ_0, lcd_dma_irq_handler);
+    irq_set_priority(DMA_IRQ_0, 0x40);
+    irq_set_enabled(DMA_IRQ_0, true);
+    irq_set_exclusive_handler(LCD_FILL_IRQ, lcd_fill_irq_handler);
+    irq_set_priority(LCD_FILL_IRQ, PICO_LOWEST_IRQ_PRIORITY);
+    irq_set_enabled(LCD_FILL_IRQ, true);
+    lcd_pend_fill();
+    sem_release(&core1_launch);
+    while (true) {
+        pd_core1_loop();
+        tight_loop_contents();
+    }
+}
+#else
 #if PICO_ON_DEVICE
 #define LOW_PRIO_IRQ 31
 #include "hardware/irq.h"
@@ -1114,6 +1359,8 @@ static void core1() {
 #endif
     }
 }
+
+#endif // PICO_DOOM_LCD
 
 #if PICO_RP2350
 #include "hardware/structs/accessctrl.h"
@@ -1386,6 +1633,7 @@ void I_DisplayFPSDots(boolean dots_on)
 {
 }
 
+#if !PICO_DOOM_LCD
 #if PICO_ON_DEVICE
 bool video_doom_adapt_for_mode(const struct scanvideo_pio_program *program, const struct scanvideo_mode *mode,
                                struct scanvideo_scanline_buffer *missing_scanvideo_scanline_buffer, uint16_t *modifiable_instructions) {
@@ -1516,5 +1764,6 @@ void simulate_video_pio_video_doom(const uint32_t *dma_data, uint32_t dma_data_s
     assert(last_was_black);
 }
 #endif
+#endif // !PICO_DOOM_LCD
 
-#endif
+#endif // PICODOOM_RENDER_NEWHOPE

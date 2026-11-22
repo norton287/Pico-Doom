@@ -1,0 +1,9 @@
+// Bluepad32 "menuconfig" settings for the Doom Bluetooth gamepad build
+#define CONFIG_BLUEPAD32_MAX_DEVICES 2
+#define CONFIG_BLUEPAD32_MAX_ALLOWLIST 4
+#define CONFIG_BLUEPAD32_GAP_SECURITY 1
+#define CONFIG_BLUEPAD32_ENABLE_BLE_BY_DEFAULT 1
+#define CONFIG_BLUEPAD32_PLATFORM_CUSTOM
+#define CONFIG_TARGET_PICO_W
+// 1 == errors only
+#define CONFIG_BLUEPAD32_LOG_LEVEL 1

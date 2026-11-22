@@ -57,3 +57,7 @@ GTAGS
 *.wad
 *.whd
 /cmake-*/
+# RP2xxx build outputs / auto-downloaded SDK
+/build-*/
+/.deps/
+!/build.sh

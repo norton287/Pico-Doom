@@ -16,6 +16,133 @@ This chocolate-doom commit that the code is branched off can be found in the `up
 
 The original Chocolate Doom README is [here](README-chocolate.md).
 
+## Pimoroni Pico Display Pack 2.0 / 2.8 (SPI LCD + buttons)
+
+This fork can also run on a plain Raspberry Pi **Pico (RP2040)** or **Pico 2 (RP2350)** with a
+[Pimoroni Pico Display Pack 2.0](https://shop.pimoroni.com/products/pico-display-pack-2-0)
+(or the 2.8" version) plugged on: no VGA board, no wiring. It renders the normal 320x200 game and
+streams it to the 320x240 ST7789 LCD. By default it is stretched to fill the screen at the 4:3 shape
+Doom was designed for (every 5th line doubled), exactly like the original game on a CRT. Use
+`-DDOOM_LCD_ASPECT_CORRECT=OFF` for square pixels with black bars instead.
+
+Everything else is the same game: save/load (stored in flash), demo playback, all cheats, intermissions/finales,
+and I2C multiplayer. Sound isn't needed for the Display Pack, but I2S audio still works if you wire up a DAC (see pins below).
+
+### Quick start
+
+You need `cmake`, a C/C++ compiler, `python3`, `git`, and the
+[Arm GNU toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads) (`arm-none-eabi-gcc`,
+13.2.rel1 is what this was built and size-checked with) on your `PATH`.
+
+```bash
+git clone --recursive <this repo> && cd rp2040-doom
+./build.sh                # Pico (RP2040) + Display Pack 2.0
+./build.sh -b pico2       # Pico 2 (RP2350) + Display Pack 2.0
+./build.sh -d PIMORONI_DISPLAY_28          # Display Pack 2.8
+```
+
+If `PICO_SDK_PATH` / `PICO_EXTRAS_PATH` are set (or `../pico-sdk` and `../pico-extras` exist) they are used;
+otherwise `build.sh` downloads the SDK and pico-extras into `.deps/`. Output goes to `build-<board>-<display>/src/`.
+
+Hold BOOTSEL, plug the Pico in, and drag **`doom_tiny_wad.uf2`** onto the drive. That one file contains the
+program *and* the shareware `DOOM1.WAD` (as `doom1.whx`), and fits a 2MB Pico with ~22K spare for saved games.
+(`doom_tiny.uf2` is the program alone, if you'd rather load the WHX yourself with
+`picotool load -v -t bin doom1.whx -o 0x10040000`.)
+
+The equivalent plain CMake invocation is:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DPICO_BOARD=pico \
+      -DPICO_SDK_PATH=/path/to/pico-sdk -DPICO_EXTRAS_PATH=/path/to/pico-extras
+cmake --build build -j
+```
+
+### Controls
+
+| Where | Button(s) | Action |
+|---|---|---|
+| Playing | **A** / **X** | turn left / turn right |
+| | **B** | move forward |
+| | **Y** | fire |
+| | **A+X** tap | use (open doors, flip switches) |
+| | **A+X** held 1s | menu (Esc) |
+| | hold **A+X**, then **B** | move backward |
+| | hold **A+X**, then tap **Y** | next weapon |
+| | all four, tap | automap |
+| | all four, hold 1.5s / 3s | `IDDQD` (god mode) / then `IDKFA` (all weapons, keys, ammo) |
+| Menus | **A** / **B** | up / down (hold to repeat) |
+| | **X** | select, or "yes" at a Y/N prompt |
+| | **Y** | close menu / back out, or "no" at a prompt |
+| | hold **Y** + **A** / **B** | left / right (sliders such as screen size) |
+| Quit (ENDOOM) screen | any | restart |
+
+Buttons can be combined with movement: e.g. hold B to run forward while tapping A+X to open a door, or hold Y to keep
+firing while turning. Saving to an empty slot names it after the level (e.g. `E1M3`), since there is no keyboard.
+
+For **every** cheat (`IDCLIP`, `IDCLEV`, `IDBEHOLD`...) and anything else needing typing, keyboard input still works too:
+the `*_usb` builds accept a USB keyboard, and all builds accept keys from
+[SDL Event Forwarder](https://github.com/kilograham/sdl_event_forwarder) over UART0 (GP0 TX / GP1 RX, 115200).
+
+### Pins (Display Pack builds)
+
+```
+ 0, 1:    UART0 TX/RX (stdio + SDL event forwarder keyboard input)
+ 2, 3:    I2C1 SDA/SCL - multiplayer link (moved from 18/19, which the LCD uses)
+ 6-8:     Display Pack 2.0 RGB LED (switched off)
+ 12-15:   Buttons A, B, X, Y
+ 16-20:   LCD DC, CS, SCK, MOSI, backlight
+ 26-28:   I2S DIN, BCK, LRCK (optional DAC; moved to 9-11 for the 2.8" pack whose LED is on 26-28)
+```
+
+`picotool info -a <uf2/elf>` lists them for any build.
+
+### Multiplayer
+
+The original I2C networking is unchanged apart from the pins: connect GP2 (SDA), GP3 (SCL) and GND between up to
+four Picos running the same build, then pick the network game option from the main menu to host or join.
+The internal pull-ups are enabled; for longer wires add 4.7K pull-ups from SDA/SCL to 3V3.
+
+### Bigger WADs (Ultimate Doom, Doom II) on bigger flash boards
+
+These need the `doom_tiny_nost` targets (WHD format) and a board with 8MB+ of flash, e.g. a Pimoroni Pico Plus 2 (16MB):
+
+```bash
+# build the converter (native, no SDL needed)
+cmake -S . -B build-whdgen -DWHD_GEN_ONLY=ON && cmake --build build-whdgen -j
+build-whdgen/src/whd_gen/whd_gen doom2.wad doom2.whd -no-super-tiny
+# build, bundling the WHD into doom_tiny_nost_wad.uf2 (the WHD lives at 0x10048000)
+./build.sh -b pimoroni_pico_plus2_rp2350 -w doom2.whd -t doom_tiny_nost
+```
+
+Saved games use whatever flash is left after the WHD; the flash size is detected at run time.
+
+### Build options
+
+| CMake option | Default | Meaning |
+|---|---|---|
+| `DOOM_DISPLAY` | `PIMORONI_DISPLAY_2` (`VGA` for `vgaboard`) | `PIMORONI_DISPLAY_2`, `PIMORONI_DISPLAY_28` or `VGA` |
+| `DOOM_LCD_ASPECT_CORRECT` | `ON` | stretch 320x200 to 320x240 (4:3) vs. 1:1 with bars |
+| `DOOM_LCD_SPI_HZ` | `62500000` | max LCD SPI clock (in spec). At 270MHz this gives 45MHz, ~37 LCD fps; `67500000` gives 67.5MHz, ~55 fps, slightly over spec |
+| `DOOM_LCD_ROTATE_180` | `OFF` | flip the picture |
+| `DOOM_BUNDLE_WHX` / `DOOM_BUNDLE_WHD` | `doom1.whx` / none | data bundled into the `*_wad.uf2` files |
+
+The link fails with a clear message if a binary would ever overlap its WAD data (it used to just silently corrupt it).
+
+### Notes on what changed for this port
+
+* `src/pico/st7789_lcd.*`: PIO + DMA write-only SPI driver for the ST7789. Core 1 converts each 8-bit line
+  (plus status bar/menu overlays, exactly as for VGA) into RGB565 and streams it; because an LCD has no beam to
+  race, falling behind just delays a frame rather than glitching. The path runs from RAM so the picture keeps
+  updating while core 0 writes saved games to flash.
+* `src/pico/i_buttons.c`: A/B/X/Y chords mapped to ordinary Doom key events. The game only asks for input once
+  per tic, which can be 30-60ms apart, too coarse for chords and holds, so the whole button state machine runs on
+  core 1 every 2ms (from the LCD interrupt) and queues finished key events for core 0. `-DDOOM_BUTTON_DEBUG=ON`
+  draws the raw button/chord state and the game's input poll gaps in the top right corner of the LCD.
+* Build fixes: RP2350 builds (hardware spin locks are now only forced on RP2040, per erratum E2),
+  `PICO_SDK_PATH` from the environment is honoured, the SDK import no longer points at an internal git server,
+  `whd_gen` builds with current GCC and without SDL2, and the USB WHX address moved to `0x10043000` because
+  the current SDK's TinyUSB made `doom_tiny_usb` overflow `0x10042000`.
+
 ## Code State
 
 Thus far, the focus has been entirely on getting RP2040 Doom running. Not a lot of time has been 
@@ -140,7 +267,7 @@ binary would just have made things bigger and slower.
 [SDL Event Forwarder](https://github.com/kilograham/sdl_event_forwarder) to tunnel keyboard input from your host 
   computer over UART. The WHX file must be loaded at `0x10040000`. 
 * **doom_tiny_usb** This is a "super tiny" version with additional USB keyboard support. Because of the extra USB 
-  code, the WHX file must be loaded at `0x10042000`. As you can see USB support via TinyUSB causes the binary to 
+  code, the WHX file must be loaded at `0x10043000` (it was `0x10042000`, but TinyUSB in the current SDK no longer fits). As you can see USB support via TinyUSB causes the binary to 
   grow by 2K (hence the move of the WHX file address) leaving less space for saved games (which are also stored in 
   flash).
 * **doom_tiny_nost** This is a "non super tiny" version of `doom_tiny` supporting larger WADs stored as WHD. The WHD 
@@ -152,7 +279,7 @@ binary would just have made things bigger and slower.
 You can load you WHD/WHX file using [picotool](https://github.com/raspberrypi/picotool). e.g.
 
 ```bash
-picotool load -v -t bin doom1.whx -o 0x10042000.
+picotool load -v -t bin doom1.whx -o 0x10043000
 ```
 
 See `whd_gen` further below for generating `WHX` or `WHD` files.
