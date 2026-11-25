@@ -189,4 +189,5 @@ final test: flash and play.
 - **2026-11-24** - Trim stage 2: removed the VGA (vgaboard / scanvideo) display path - `video_doom.pio`, the
   non-LCD half of `src/pico/i_video.c` (-528 lines, resolved with `unifdef -DPICO_DOOM_LCD=1`), the VGA
   CMake/build.sh options and README VGA build/pin sections. The `PICO_SCANVIDEO_*` defines stay: the LCD code
-  uses them to size its text buffers. All 17 binaries byte-identical again.
+  uses them to size its text buffers. All 17 binaries byte-identical again. Host (`PICO_PLATFORM=host` / pico_host_sdl)
+  builds went with it: they used the VGA path, and the README section describing them was removed.

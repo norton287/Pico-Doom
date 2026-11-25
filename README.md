@@ -285,22 +285,10 @@ did my ancient
 Dell keyboard. Your keyboard may just do nothing, or may cause a crash. If so, for now, you are stuck forwarding 
 keys from another PC via sdl_event_forwarder.
 
-### RP2040 Doom builds not targeting an RP2040 device
+### Host (PC-simulated) builds
 
-You can also build the RP2040 Doom to run on your host computer (Linux or macOS) by using
-[pico_host_sdl](https://github.com/raspberrypi/pico-host-sdl) which simulates RP2040 based video/audio output using SDL.
-
-This version currently embeds the WHD/WHX in `src/tiny.whd.h` so you must generate this file.
-
-You can do this via `./cup.sh <whd/whx_file>`
-
-```bash
-mkdir host-build
-cd host-build
-cmake -DPICO_PLATFORM=host -DPICO_SDK_PATH=/path/to/pico-sdk -DPICO_EXTRAS_PATH=/path/to/pico-extras -DPICO_SDK_PRE_LIST_DIRS=/path/to/pico_host_sdl ..
-```
-
-... and then `make` as usual.
+Upstream rp2040-doom could also run on a PC via [pico_host_sdl](https://github.com/raspberrypi/pico-host-sdl), but that
+used the VGA/scanvideo output, which this fork has removed; host builds are no longer supported.
 
 ## whd_gen
 
