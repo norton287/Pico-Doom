@@ -1,10 +1,4 @@
-if (PICO_SDK)
-    set(BINARIES doom)
-else()
-    # comment out heretic/hexen/strife for now, as whilst they may build, how well they work is unclear
-#    set(BINARIES doom heretic hexen strife setup)
-    set(BINARIES doom setup)
-endif()
+set(BINARIES doom)
 
 add_subdirectory(adpcm-xq)
 
@@ -15,11 +9,7 @@ endforeach()
 # Common source files used by absolutely everything:
 cmake_policy(SET CMP0076 NEW)
 
-if (NOT PICO_SDK)
-    set(I_PLATFORM sdl)
-else()
-    set(I_PLATFORM pico)
-endif()
+set(I_PLATFORM pico)
 
 add_library(common INTERFACE)
 target_sources(common INTERFACE
@@ -34,40 +24,9 @@ target_compile_definitions(common INTERFACE
 #        DEBUG_MOBJ=1
 )
 
-if (NOT PICO_SDK)
-    add_library(common_sdl INTERFACE)
-    target_sources(common_sdl INTERFACE
-            i_system.c
-    )
-else()
-    add_subdirectory(pico)
-endif()
+add_subdirectory(pico)
 
 target_link_libraries(common INTERFACE common_${I_PLATFORM})
-
-# todo chocolate-server also doesn't currently build
-if (NOT PICO_SDK)
-    # Dedicated server (chocolate-server):
-
-    set(DEDSERV_FILES
-        d_dedicated.c
-        d_mode.c             d_mode.h
-        i_timer.c            i_timer.h
-        net_common.c         net_common.h
-        net_dedicated.c      net_dedicated.h
-        net_io.c             net_io.h
-        net_packet.c         net_packet.h
-        net_sdl.c            net_sdl.h
-        net_query.c          net_query.h
-        net_server.c         net_server.h
-        net_structrw.c       net_structrw.h
-        z_native.c           z_zone.h)
-
-    add_executable("${PROGRAM_PREFIX}server" WIN32 ${COMMON_SOURCE_FILES} ${DEDSERV_FILES})
-    target_include_directories("${PROGRAM_PREFIX}server"
-                               PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-    target_link_libraries("${PROGRAM_PREFIX}server" common SDL2::SDL2main SDL2::net)
-endif()
 
 # Source files used by the game BINARIES (chocolate-doom, etc.)
 
@@ -83,17 +42,14 @@ target_sources(game INTERFACE
                         d_ticcmd.h
     deh_str.c           deh_str.h
     gusconf.c           gusconf.h
-    i_cdmus.h
     i_endoom.h
     i_glob.h
     i_input.h
     i_joystick.h
     i_swap.h
-    i_midipipe.h
     i_sound.h
     i_timer.h
     i_video.h
-    i_videohr.h
     midifile.c          midifile.h
     mus2mid.c           mus2mid.h
     m_bbox.c            m_bbox.h
@@ -124,195 +80,12 @@ target_sources(game INTERFACE
 
 )
 
-if (NOT PICO_SDK)
-    add_library(game_sdl INTERFACE)
-    target_sources(game_sdl INTERFACE
-            # todo maybe a separate network library
-            net_common.c        net_common.h
-            net_dedicated.c     net_dedicated.h
-            net_defs.h
-            net_gui.c           net_gui.h
-            net_io.c            net_io.h
-            net_loop.c          net_loop.h
-            net_packet.c        net_packet.h
-            net_query.c         net_query.h
-            net_sdl.c           net_sdl.h
-            net_server.c        net_server.h
-            net_structrw.c      net_structrw.h
-
-            w_file_stdc.c
-            w_file_win32.c
-
-            i_cdmus.c
-            i_endoom.c
-            i_glob.c
-            i_input.c
-            i_joystick.c
-
-            i_midipipe.c
-            i_musicpack.c
-            i_pcsound.c
-            i_sdlmusic.c
-            i_sdlsound.c
-            i_timer.c
-            i_video.c
-            i_videohr.c
-        )
-else()
-    add_library(game_pico INTERFACE)
-endif()
+add_library(game_pico INTERFACE)
 
 target_link_libraries(game INTERFACE game_${I_PLATFORM})
-if(MSVC)
-    target_sources(game INTERFACE
-         "../win32/win_opendir.c" "../win32/win_opendir.h")
-endif()
 
 target_link_libraries(game INTERFACE common opl)
 
-add_library(game_deh INTERFACE)
-target_sources(game_deh INTERFACE
-                        deh_defs.h
-    deh_io.c            deh_io.h
-    deh_main.c          deh_main.h
-    deh_mapping.c       deh_mapping.h
-    deh_text.c)
-
-target_link_libraries(game_deh INTERFACE game)
-
-if (NOT PICO_SDK)
-    set(EXTRA_LIBS SDL2::SDL2main SDL2::SDL2 SDL2::mixer SDL2::net textscreen pcsound)
-    if(SAMPLERATE_FOUND)
-        list(APPEND EXTRA_LIBS samplerate::samplerate)
-    endif()
-    if(PNG_FOUND)
-        list(APPEND EXTRA_LIBS PNG::PNG)
-    endif()
-
-    if ("doom" IN_LIST BINARIES)
-        if(WIN32)
-            add_executable("${PROGRAM_PREFIX}doom" WIN32 "${CMAKE_CURRENT_BINARY_DIR}/resource.rc")
-        else()
-            add_executable("${PROGRAM_PREFIX}doom")
-        endif()
-        target_link_libraries("${PROGRAM_PREFIX}doom" PRIVATE game_deh)
-
-        target_include_directories("${PROGRAM_PREFIX}doom"
-                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-        target_link_libraries("${PROGRAM_PREFIX}doom" PRIVATE doom ${EXTRA_LIBS})
-
-        if(MSVC)
-            set_target_properties("${PROGRAM_PREFIX}doom" PROPERTIES
-                                  LINK_FLAGS "/MANIFEST:NO")
-        endif()
-    endif()
-
-    if ("heretic" IN_LIST BINARIES)
-        if(WIN32)
-            add_executable("${PROGRAM_PREFIX}heretic" WIN32 "${CMAKE_CURRENT_BINARY_DIR}/resource.rc")
-        else()
-            add_executable("${PROGRAM_PREFIX}heretic" )
-        endif()
-        target_link_libraries("${PROGRAM_PREFIX}heretic" PRIVATE game_deh)
-
-        target_include_directories("${PROGRAM_PREFIX}heretic"
-                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-        target_link_libraries("${PROGRAM_PREFIX}heretic" PRIVATE heretic ${EXTRA_LIBS})
-
-        if(MSVC)
-            set_target_properties("${PROGRAM_PREFIX}heretic" PROPERTIES
-                                  LINK_FLAGS "/MANIFEST:NO")
-        endif()
-    endif()
-
-    if ("hexen" IN_LIST BINARIES)
-        if(WIN32)
-            add_executable("${PROGRAM_PREFIX}hexen" WIN32 "${CMAKE_CURRENT_BINARY_DIR}/resource.rc")
-        else()
-            add_executable("${PROGRAM_PREFIX}hexen")
-        endif()
-        target_link_libraries("${PROGRAM_PREFIX}hexen" PRIVATE game)
-
-        target_include_directories("${PROGRAM_PREFIX}hexen"
-                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-        target_link_libraries("${PROGRAM_PREFIX}hexen" PRIVATE hexen ${EXTRA_LIBS})
-
-        if(MSVC)
-            set_target_properties("${PROGRAM_PREFIX}hexen" PROPERTIES
-                                  LINK_FLAGS "/MANIFEST:NO")
-        endif()
-    endif()
-
-    if ("strife" IN_LIST BINARIES)
-        if(WIN32)
-            add_executable("${PROGRAM_PREFIX}strife" WIN32 ${SOURCE_FILES_WITH_DEH} "${CMAKE_CURRENT_BINARY_DIR}/resource.rc")
-        else()
-            add_executable("${PROGRAM_PREFIX}strife" ${SOURCE_FILES_WITH_DEH})
-        endif()
-        target_link_libraries("${PROGRAM_PREFIX}strife" PRIVATE game_deh)
-
-        target_include_directories("${PROGRAM_PREFIX}strife"
-                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-        target_link_libraries("${PROGRAM_PREFIX}strife" PRIVATE strife ${EXTRA_LIBS})
-
-        if(MSVC)
-            set_target_properties("${PROGRAM_PREFIX}strife" PROPERTIES
-                                  LINK_FLAGS "/MANIFEST:NO")
-        endif()
-    endif()
-
-    # Source files needed for chocolate-setup:
-
-    if ("setup" IN_LIST BINARIES)
-        set(SETUP_FILES
-            deh_str.c           deh_str.h
-            d_mode.c            d_mode.h
-            d_iwad.c            d_iwad.h
-            i_timer.c           i_timer.h
-            m_config.c          m_config.h
-            m_controls.c        m_controls.h
-            net_io.c            net_io.h
-            net_packet.c        net_packet.h
-            net_sdl.c           net_sdl.h
-            net_query.c         net_query.h
-            net_structrw.c      net_structrw.h
-            z_native.c          z_zone.h)
-
-        if(WIN32)
-            add_executable("${PROGRAM_PREFIX}setup" WIN32 ${SETUP_FILES} "${CMAKE_CURRENT_BINARY_DIR}/setup-res.rc")
-        else()
-            add_executable("${PROGRAM_PREFIX}setup" ${SETUP_FILES} )
-        endif()
-        target_link_libraries("${PROGRAM_PREFIX}setup" PRIVATE setup common)
-
-        target_include_directories("${PROGRAM_PREFIX}setup"
-                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-        if (NOT PICO_SDK)
-            target_link_libraries("${PROGRAM_PREFIX}setup" PRIVATE SDL2::SDL2main SDL2::SDL2 SDL2::mixer SDL2::net)
-        endif()
-        target_link_libraries("${PROGRAM_PREFIX}setup" PRIVATE textscreen)
-
-        if(MSVC)
-            set_target_properties("${PROGRAM_PREFIX}setup" PROPERTIES
-                                  LINK_FLAGS "/MANIFEST:NO")
-        endif()
-    endif()
-
-    add_executable(midiread midifile.c z_native.c i_system.c m_argv.c m_misc.c)
-    target_compile_definitions(midiread PRIVATE "-DTEST")
-    target_include_directories(midiread PRIVATE "." "${CMAKE_CURRENT_BINARY_DIR}/../")
-
-    if (NOT PICO_SDK)
-        target_link_libraries(midiread SDL2::SDL2main SDL2::SDL2)
-    endif()
-
-    add_executable(mus2mid mus2mid.c memio.c z_native.c i_system.c m_argv.c m_misc.c)
-    target_compile_definitions(mus2mid PRIVATE "-DSTANDALONE")
-    target_include_directories(mus2mid PRIVATE "." "${CMAKE_CURRENT_BINARY_DIR}/../")
-    if (NOT PICO_SDK)
-        target_link_libraries(mus2mid SDL2::SDL2main SDL2::SDL2)
-    endif()
-endif() # NOT PICO_SDK
 add_library(small_doom_common INTERFACE)
 
 target_link_libraries(small_doom_common INTERFACE adpcm-lib) # handy to have about
@@ -512,7 +285,7 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
             image_decoder.c
             )
     target_include_directories(doom_tiny${SUFFIX} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-    target_link_libraries(doom_tiny${SUFFIX} PRIVATE doom ${EXTRA_LIBS})
+    target_link_libraries(doom_tiny${SUFFIX} PRIVATE doom)
 
     target_link_libraries(doom_tiny${SUFFIX} PRIVATE small_doom_common)
 

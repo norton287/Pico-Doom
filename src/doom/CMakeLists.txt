@@ -73,8 +73,4 @@ target_sources(doom INTERFACE
             wi_stuff.c      wi_stuff.h)
 
 target_include_directories(doom INTERFACE "../" "${CMAKE_CURRENT_BINARY_DIR}/../../")
-if (NOT PICO_SDK)
-    target_link_libraries(doom INTERFACE SDL2::SDL2 SDL2::mixer SDL2::net)
-else()
-    target_link_libraries(doom INTERFACE pico_stdlib pico_multicore)
-endif()
+target_link_libraries(doom INTERFACE pico_stdlib pico_multicore)

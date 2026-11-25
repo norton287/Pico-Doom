@@ -3,7 +3,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 cmake_minimum_required(VERSION 3.13)
 
 # A Pico SDK location (or a request to fetch one) means we're doing a Pico (RP2040/RP2350) build;
-# otherwise this is a native chocolate-doom/whd_gen build. The environment variables are honoured too.
+# the only other build is the native whd_gen tool (-DWHD_GEN_ONLY=ON). The environment variables are honoured too.
 if (NOT WHD_GEN_ONLY AND NOT PICO_SDK_PATH AND DEFINED ENV{PICO_SDK_PATH})
     set(PICO_SDK_PATH $ENV{PICO_SDK_PATH})
 endif()
@@ -14,8 +14,8 @@ endif()
 
 project("Chocolate Doom" VERSION 3.0.0 LANGUAGES C CXX)
 
-# -DWHD_GEN_ONLY=ON builds just the native whd_gen WAD converter, without needing SDL2
-option(WHD_GEN_ONLY "Only build the whd_gen WAD -> WHD/WHX converter (no SDL2 needed)" OFF)
+# -DWHD_GEN_ONLY=ON builds just the native whd_gen WAD converter (no Pico SDK)
+option(WHD_GEN_ONLY "Only build the native whd_gen WAD -> WHD/WHX converter" OFF)
 if (WHD_GEN_ONLY)
     if (PICO_SDK_PATH)
         message(FATAL_ERROR "WHD_GEN_ONLY is a native (host) build; don't pass PICO_SDK_PATH")
@@ -29,6 +29,10 @@ if (WHD_GEN_ONLY)
     add_subdirectory(src/adpcm-xq)
     add_subdirectory(src/whd_gen)
     return()
+endif()
+if (NOT PICO_SDK_PATH)
+    message(FATAL_ERROR "This fork only builds for the Pico (use ./build.sh, or set PICO_SDK_PATH) "
+            "or the native whd_gen tool (-DWHD_GEN_ONLY=ON). The original PC (SDL) build has been removed.")
 endif()
 enable_language(CXX)
 set(CMAKE_CXX_STANDARD 14)
@@ -65,8 +69,6 @@ if (PICO_SDK_PATH)
     endif()
     option(DOOM_BLUETOOTH "Build doom_tiny_bt with Bluetooth gamepad support (Pico 2 W)" ${DOOM_BLUETOOTH_DEFAULT})
 
-    # we are using git@github.com:liamfraser/tinyusb.git as it has some RP2040 fixes that aren't upstreamed yet
-    #set(PICO_TINYUSB_PATH ${CMAKE_CURRENT_LIST_DIR}/3rdparty/tinyusb)
     # this only affects device builds device, but we want to use zone for malloc in this case so we don't have two separate elastic spaces and can fit more in
     set(SKIP_PICO_MALLOC 1)
     pico_sdk_init()
@@ -95,32 +97,8 @@ set(PACKAGE_LICENSE "GNU General Public License, version 2")
 
 # Any settings that should apply to all targets in this directory and all
 # subdirectories should go here.  Use judiciously.
-if(MSVC)
-    add_definitions("/D_CRT_SECURE_NO_WARNINGS" "/D_CRT_SECURE_NO_DEPRECATE"
-                    "/D_CRT_NONSTDC_NO_DEPRECATE")
-else()
-    #add_compile_options("-Wall" "-Wdeclaration-after-statement" "-Wredundant-decls")
-    add_compile_options("-Wall" "-Wredundant-decls")
-endif()
-
-# Note PICO_SDK path is set by the SDK initialization if it occurs above
-if (NOT PICO_SDK)
-    find_package(SDL2 2.0.1 REQUIRED)
-    find_package(SDL2_mixer 2.0.0 REQUIRED)
-    find_package(SDL2_net 2.0.0 REQUIRED)
-
-    # Check for libsamplerate.
-    find_package(samplerate)
-    if(SAMPLERATE_FOUND)
-        set(HAVE_LIBSAMPLERATE TRUE)
-    endif()
-
-    # Check for libpng.
-    find_package(PNG)
-    if(PNG_FOUND)
-        set(HAVE_LIBPNG TRUE)
-    endif()
-endif()
+#add_compile_options("-Wall" "-Wdeclaration-after-statement" "-Wredundant-decls")
+add_compile_options("-Wall" "-Wredundant-decls")
 
 set(HAVE_MMAP 1)
 find_package(m)
@@ -131,9 +109,6 @@ check_symbol_exists(strcasecmp "strings.h" HAVE_DECL_STRCASECMP)
 check_symbol_exists(strncasecmp "strings.h" HAVE_DECL_STRNCASECMP)
 check_include_file("dirent.h" HAVE_DIRENT_H)
 
-string(CONCAT WINDOWS_RC_VERSION "${PROJECT_VERSION_MAJOR}, "
-    "${PROJECT_VERSION_MINOR}, ${PROJECT_VERSION_PATCH}, 0")
-
 # Without a hyphen. This is used for the bash-completion scripts.
 string(TOLOWER "${PACKAGE_SHORTNAME}" PROGRAM_SPREFIX)
 
@@ -142,10 +117,7 @@ set(PROGRAM_PREFIX "${PROGRAM_SPREFIX}-")
 
 configure_file(cmake/config.h.cin config.h)
 
-configure_file(src/resource.rc.in src/resource.rc)
-configure_file(src/setup-res.rc.in src/setup-res.rc)
-configure_file(src/setup/setup-manifest.xml.in src/setup/setup-manifest.xml)
 
-foreach(SUBDIR textscreen midiproc opl pcsound src)
+foreach(SUBDIR opl src)
     add_subdirectory("${SUBDIR}")
 endforeach()

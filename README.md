@@ -7,10 +7,8 @@ entire shareware `DOOM1.WAD` which is 4M big on a Raspberry Pi Pico with only 2M
 
 You can read many details on this port in the blog post [here](https://kilograham.github.io/rp2040-doom/).
 
-Note that a hopefully-fully-functional `chocolate-doom` executable is buildable from this RP2xxx code base as a 
-means of 
-verification that everything still works, but whilst they can still be built, Hexen, Strife and Heretic are almost 
-certainly broken, so are not built by default.
+This fork only builds for the Pico (plus the native `whd_gen` WAD converter): the original PC (SDL) `chocolate-doom`
+build and the never-built Heretic / Hexen / Strife code have been removed (see `BIBLE.md`).
 
 This chocolate-doom commit that the code is branched off can be found in the `upstream` branch.
 
@@ -215,20 +213,14 @@ haven't tried.
 
 The build uses `CMake`.
 
-## Regular chocolate-doom/native builds
+## Native whd_gen build
 
-To build everything, assuming you have SDL2 dependencies installed, you can create a build directory:
+The only native (non-Pico) build is the `whd_gen` WAD converter:
 
 ```bash
-mkdir build
-cd build
-cmake ..
+cmake -S . -B build-whd_gen -DWHD_GEN_ONLY=ON
+cmake --build build-whd_gen -j
 ```
-
-And then run `make` or `make -j<num_cpus>` from that directory. To build a particular target e.g. `chocolate-doom`, 
-do `make chocolate-doom`
-
-Note this is the way you build the `whd_gen` tool too.
 
 ## RP2040 Doom builds
 
@@ -322,8 +314,8 @@ cmake -DPICO_PLATFORM=host -DPICO_SDK_PATH=/path/to/pico-sdk -DPICO_EXTRAS_PATH=
 
 ## whd_gen
 
-`doom1.whx` is includd in this repository, otherwise you need to build `whd_gen` using the regular native build 
-instructions above.
+`doom1.whx` is included in this repository; for other WADs build `whd_gen` as described in
+"Native whd_gen build" above.
 
 To generate a WHX file (you must use this to convert DOOM1.WAD to run on a 2M Raspberry Pi Pico)
 

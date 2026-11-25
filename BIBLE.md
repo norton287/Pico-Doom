@@ -19,6 +19,13 @@ ported to a **Pimoroni Pico Display Pack 2.0 / 2.8** (ST7789 320x240 SPI LCD + A
 
 ## 2. Build
 
+**What builds:** only Pico firmware (`doom_tiny`, `doom_tiny_nost`, `doom_tiny_usb`, `doom_tiny_nost_usb`, and
+`doom_tiny_bt` on a Pico 2 W) and the native `whd_gen` converter (`-DWHD_GEN_ONLY=ON`). The PC/SDL build,
+Heretic/Hexen/Strife, autotools and installer packaging were removed on 2026-11-24 (all firmware verified
+byte-identical before/after). Configuring without the Pico SDK stops with a message saying so.
+The Pico build still uses `opl/` (music synth), `src/adpcm-xq` (sound compression) and
+`textscreen/fonts/normal.h` (the quit-screen font) from the inherited tree.
+
 Toolchain on this box lives in `/opt/pico`:
 `arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi`, `pico-sdk` (develop, with `lib/btstack` and
 `lib/cyw43-driver`), `pico-extras`, `bluepad32` (commit 80d6314, 5.0.0-beta0).
@@ -132,7 +139,7 @@ Menus (all pads): d-pad/stick to move, A select / yes, B or Start back / no.
 running) felt laggy, and fixed fast steps felt jerky and overshot. Now a turn starts at **640** (a tap is a
 ~3.5° fine aim) and ramps linearly over `TURN_RAMP_TICS` = 8 tics to `TURN_MAX` = **896** (~4.9°/tic), or to
 **1280** while run is held for quick spins. The LCD shows the game a frame or two late, so overshoot is roughly
-release speed x that delay; that's why the normal top speed is capped. PC builds are unchanged.
+release speed x that delay; that's why the normal top speed is capped.
 
 ## 6. Bluetooth debug strip (`-DDOOM_BT_DEBUG=ON`)
 
@@ -174,3 +181,7 @@ final test: flash and play.
   acceleration with capped top speed for button / d-pad turning; BIBLE.md started.
   Release build verified on hardware: save/load across a power cycle works and the Zero 2 reconnects by
   itself. Published to github.com/norton287/Pico-Doom (replacing GitHub's MIT-licence initial commit).
+- **2026-11-24** - Trim stage 1: removed the never-built Heretic/Hexen/Strife sources, the PC/SDL build
+  (setup, textscreen except its font, pcsound, midiproc, SDL platform/net sources, OPL PC backends, win32, man,
+  data, packaging), autotools, Travis, stale scripts/images and the unused TinyUSB submodule (USB builds use
+  the SDK's TinyUSB). All 17 firmware binaries byte-identical to before.
