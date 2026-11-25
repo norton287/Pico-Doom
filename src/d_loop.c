@@ -624,6 +624,32 @@ void TryRunTics(void) {
     lowtic = GetLowTic();
 
     availabletics = lowtic - gametic / ticdup;
+#if PICO_BUTTON_INPUT && DOOM_BUTTON_DEBUG
+    {
+        // once per frame: longest frame and deepest ticcmd queue over the last second
+        extern volatile uint16_t button_debug_max_frame_ms, button_debug_avg_frame_ms;
+        extern volatile uint8_t button_debug_max_queued_tics;
+        static uint32_t last_us, window_start_us;
+        static uint16_t frame_max;
+        static uint32_t frames;
+        static uint8_t queue_max;
+        uint32_t now = time_us_32();
+        uint32_t frame_ms = (now - last_us) / 1000u;
+        last_us = now;
+        frames++;
+        if (frame_ms > frame_max) frame_max = (uint16_t) (frame_ms > 0xffff ? 0xffff : frame_ms);
+        if (availabletics > queue_max) queue_max = (uint8_t) (availabletics > 255 ? 255 : availabletics);
+        if (now - window_start_us > 1000000u) {
+            button_debug_max_frame_ms = frame_max;
+            button_debug_avg_frame_ms = (uint16_t) ((now - window_start_us) / 1000u / (frames ? frames : 1));
+            frames = 0;
+            button_debug_max_queued_tics = queue_max;
+            frame_max = 0;
+            queue_max = 0;
+            window_start_us = now;
+        }
+    }
+#endif
 
     // decide how many tics to run
 

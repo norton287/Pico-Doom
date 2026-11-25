@@ -226,10 +226,12 @@ static const struct
 
 #define SLOWTURNTICS	6 
 #if PICO_BUTTON_INPUT
-// Display Pack buttons / Bluetooth d-pads (no analog turn): turning starts at walking speed and accelerates
-// smoothly over this many tics to TURN_MAX (or to running speed while run is held, for quick spins).
-// The screen lags the game by a frame or two, so overshoot grows with the speed you let go at.
-#define TURN_RAMP_TICS	8
+// Display Pack buttons / Bluetooth d-pads (no analog turn): the first TURN_FINE_TICS of a press turn at vanilla's
+// slow speed (so a tap is a small, precise nudge), then turning accelerates from walking speed over TURN_RAMP_TICS
+// to TURN_MAX (or to running speed while run is held, for quick spins). The screen lags the game by a frame or
+// two, so overshoot grows with the speed you let go at.
+#define TURN_FINE_TICS	2
+#define TURN_RAMP_TICS	6
 #define TURN_MAX	896
 #endif
  
@@ -424,16 +426,28 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
 	        || joyxmove > 0
 #endif
     )
+    {
+#if PICO_BUTTON_INPUT && DOOM_BUTTON_DEBUG
+	if (!turnheld) {
+	    extern volatile uint32_t button_debug_turn_press_us;
+	    extern volatile uint16_t button_debug_turn_latency_ms;
+	    uint32_t ms = (time_us_32() - button_debug_turn_press_us) / 1000u;
+	    button_debug_turn_latency_ms = (uint16_t) (ms > 0xffff ? 0xffff : ms);
+	}
+#endif
 	turnheld += ticdup;
+    }
     else 
 	turnheld = 0; 
 
 #if PICO_BUTTON_INPUT
-    // buttons / d-pads: a tap turns a little (walking speed, fine aim); holding accelerates evenly to
-    // TURN_MAX, or to running speed with run held. Big fixed steps felt jerky and overshot.
-    {
+    // buttons / d-pads: a tap turns a little (vanilla slow speed, fine aim); holding then accelerates evenly
+    // from walking speed to TURN_MAX, or to running speed with run held. Big fixed steps felt jerky and overshot.
+    if (turnheld <= TURN_FINE_TICS) {
+        turnamount = angleturn[2];
+    } else {
         int top = speed ? angleturn[1] : TURN_MAX;
-        int ramp = turnheld > 1 ? turnheld - 1 : 0;
+        int ramp = turnheld - TURN_FINE_TICS;
         if (ramp > TURN_RAMP_TICS) ramp = TURN_RAMP_TICS;
         turnamount = angleturn[0] + (top - angleturn[0]) * ramp / TURN_RAMP_TICS;
     }

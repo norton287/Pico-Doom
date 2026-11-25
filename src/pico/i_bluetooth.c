@@ -166,6 +166,8 @@ static void doom_bt_on_device_disconnected(uni_hid_device_t *d) {
     if (!connected_count) {
         publish(NULL, false);
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        // look for a controller again (and let paired ones reconnect)
+        uni_bt_start_scanning_and_autoconnect_unsafe();
     }
 }
 
@@ -179,6 +181,9 @@ static uni_error_t doom_bt_on_device_ready(uni_hid_device_t *d) {
     connected_count++;
     // the Pico 2 W's green LED shows a controller is connected
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+    // stop scanning while one is connected: classic inquiry plus BLE scanning hands core 0 every advert from
+    // every nearby device, which halved Doom's frame rate (100ms vs 50ms per frame on a Pico 2 W)
+    uni_bt_stop_scanning_unsafe();
     return UNI_ERROR_SUCCESS;
 }
 

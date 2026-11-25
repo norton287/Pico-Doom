@@ -899,6 +899,22 @@ static void __not_in_flash_func(lcd_render_scanline)(uint32_t *dest, int scanlin
         uint16_t *d = (uint16_t *) dest;
         for (uint i = 0; i < gap; i++) d[i] = c;
     }
+    // more bars: [cyan] longest frame (1px/ms), [magenta] most queued tics (20px each),
+    // [white] turn press -> first turning ticcmd (1px/ms, latest press)
+    // [yellow] average frame (1px/ms)
+    if (scanline >= 18 && scanline < 40 && (scanline - 18) % 6 < 4) {
+        extern volatile uint16_t button_debug_max_frame_ms, button_debug_turn_latency_ms, button_debug_avg_frame_ms;
+        extern volatile uint8_t button_debug_max_queued_tics;
+        int bar = (scanline - 18) / 6;
+        uint len = bar == 0 ? button_debug_max_frame_ms : bar == 1 ? button_debug_max_queued_tics * 20u
+                 : bar == 2 ? button_debug_turn_latency_ms : button_debug_avg_frame_ms;
+        uint16_t c = bar == 0 ? 0x07FF : bar == 1 ? 0xF81F : bar == 2 ? 0xFFFF : 0xFFE0;
+        if (len > SCREENWIDTH) len = SCREENWIDTH;
+        uint16_t *d = (uint16_t *) dest;
+        for (uint i = 0; i < len; i++) d[i] = c;
+        // tick marks every 50px so lengths can be read off
+        for (uint i = 50; i < SCREENWIDTH; i += 50) d[i] = 0;
+    }
 #endif
 #if PICO_BLUETOOTH_INPUT && DOOM_BT_DEBUG
     // Bluetooth bring-up strip, top left: [stage][heartbeat][discovered][connected][ready][reports]

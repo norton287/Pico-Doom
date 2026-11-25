@@ -47,7 +47,7 @@ Build options (Display Pack builds):
 | Option | Default | Effect |
 |---|---|---|
 | `DOOM_BLUETOOTH` | ON for `PICO_BOARD=pico2_w` | adds the `doom_tiny_bt` target |
-| `DOOM_BUTTON_DEBUG` | OFF | top-right strip: raw buttons, chord state, and a bar = longest gap between the game's input polls in the last second (1px/ms; green <50ms, yellow <150, red beyond) |
+| `DOOM_BUTTON_DEBUG` | OFF | top-right strip: raw buttons, chord state, and bars (black tick every 50px): green = longest gap between input polls (1px/ms); then cyan = longest frame, magenta = most queued ticcmds (20px/tic), white = turn press -> first turning ticcmd, yellow = average frame (all 1px/ms, last second) |
 | `DOOM_BT_DEBUG` | OFF | top-left Bluetooth strip (section 6) |
 | `DOOM_LCD_ASPECT_CORRECT` | ON | 320x200 stretched to 4:3; OFF = square pixels with bars |
 
@@ -94,6 +94,11 @@ in `src/pico/i_buttons.c`.
 - Pico 2 W onboard LED = a controller is connected (it flashes on during radio init, then goes off while
   scanning).
 - Pairing keys persist in flash, so a paired controller reconnects by itself.
+- **Scanning stops while a controller is connected** (`uni_bt_stop_scanning_unsafe` in `on_device_ready`) and
+  restarts when the last one disconnects. Bluepad32 otherwise keeps a classic inquiry + BLE scan running, and
+  processing every nearby device's adverts on core 0 **halved the frame rate** (measured on the Pico 2 W:
+  ~100ms average frame with scanning vs ~50ms without - the same as the buttons-only build). Only one controller
+  at a time is supported as a result.
 
 **Pairing the 8BitDo Zero 2:** power on with **B + Start** (D-input / Android mode), then hold **Select 3s**
 until its LED blinks fast. LED solid = connected. The Zero 2 has no separate pair button. (Other 8BitDo pads:
@@ -137,9 +142,12 @@ Menus (all pads): d-pad/stick to move, A select / yes, B or Start back / no.
 ### Turning (all button / d-pad input)
 
 `src/doom/g_game.c`, under `PICO_BUTTON_INPUT`: vanilla's turn (6 tics at 320, then 640 walking / 1280
-running) felt laggy, and fixed fast steps felt jerky and overshot. Now a turn starts at **640** (a tap is a
-~3.5° fine aim) and ramps linearly over `TURN_RAMP_TICS` = 8 tics to `TURN_MAX` = **896** (~4.9°/tic), or to
-**1280** while run is held for quick spins. The LCD shows the game a frame or two late, so overshoot is roughly
+running) felt laggy, and fixed fast steps felt jerky and overshot. Now the first `TURN_FINE_TICS` = 2 tics of a
+press turn at vanilla's slow **320** (a 2-tic tap is ~3.5°: precise taps), then turning ramps linearly from 640
+over `TURN_RAMP_TICS` = 6 tics to `TURN_MAX` = **896** (~4.9°/tic), or to **1280** while run is held for quick
+spins. (Starting at 640 doubled a tap and overshot.) Most "sluggishness" was frame rate, not the curve: see
+the scanning note in section 5. A ticcmd samples the keys when it's built (NetUpdate also runs mid-render), and
+the game runs it at the next frame, so input lag is about a frame plus the LCD's frame. The LCD shows the game a frame or two late, so overshoot is roughly
 release speed x that delay; that's why the normal top speed is capped.
 
 ## 6. Bluetooth debug strip (`-DDOOM_BT_DEBUG=ON`)
@@ -195,3 +203,7 @@ final test: flash and play.
   `i_system.c`, the `chocolate-doom` and host-mode leftovers in `src/CMakeLists.txt`, and the broken `.lvimrc`
   (it looked for autotools' `configure.in`); `build.sh -h` no longer prints a stray line; README lists
   `doom_tiny_bt` and points to upstream for its `upstream` branch. Firmware byte-identical again.
+- **2026-11-25** - Turning/latency: measured with new `DOOM_BUTTON_DEBUG` bars (frame time, queue depth,
+  press->turn). Bluetooth scanning while connected halved the frame rate (~100ms vs ~50ms avg); scanning now
+  stops once a controller is ready and resumes on disconnect. Taps restored to vanilla precision (first 2 tics
+  at 320, then ramp 640->896 over 6 tics).

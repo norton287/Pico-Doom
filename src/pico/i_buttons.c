@@ -195,6 +195,12 @@ volatile uint8_t button_debug_use_count;
 volatile uint8_t button_debug_esc_count;
 volatile uint8_t button_debug_poll_count;
 volatile uint16_t button_debug_max_poll_gap_ms;
+// turn latency / frame pacing (written by g_game.c and d_loop.c, drawn by i_video.c)
+volatile uint32_t button_debug_turn_press_us;   // core 1: when a turn key last went down
+volatile uint16_t button_debug_turn_latency_ms; // press -> first turning ticcmd, latest
+volatile uint16_t button_debug_max_frame_ms;    // longest frame in the last second
+volatile uint16_t button_debug_avg_frame_ms;    // average frame in the last second
+volatile uint8_t button_debug_max_queued_tics;  // most ticcmds waiting when a frame ran its tics
 #endif
 
 static __force_inline uint8_t read_raw(void) {
@@ -244,6 +250,9 @@ static uint RAM_FUNC(held_key_code)(uint bit) {
 
 static void RAM_FUNC(set_held_keys)(uint8_t want) {
     uint8_t changed = want ^ held_keys;
+#if DOOM_BUTTON_DEBUG
+    if ((want & ~held_keys) & (HELD_LEFT | HELD_RIGHT)) button_debug_turn_press_us = time_us_32();
+#endif
     for (uint bit = 1; bit <= HELD_LAST; bit <<= 1) {
         if (changed & bit) emit(want & bit, held_key_code(bit));
     }
