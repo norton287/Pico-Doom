@@ -61,3 +61,7 @@ GTAGS
 /build-*/
 /.deps/
 !/build.sh
+
+# local Claude Code session notes / plan workspaces
+.remember/
+.superpowers/
