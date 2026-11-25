@@ -74,15 +74,38 @@ wad wad::read(const std::string &filename) {
     FILE *in = fopen(filename.c_str(), "rb");
     if (!in) throw std::invalid_argument(filename + " not found");
 
+    fseek(in, 0, SEEK_END);
+    long file_size = ftell(in);
+    fseek(in, 0, SEEK_SET);
+    if (file_size < (long)sizeof(wadinfo_t)) {
+        throw std::runtime_error(filename + " is too small to be a WAD");
+    }
     auto header_raw = read_raw<wadinfo_t>(in);
     auto header = header_raw.get();
     if (strncmp(header->identification, "IWAD", 4)) {
         throw std::runtime_error("file is not an IWAD");
     }
+    // a damaged or truncated WAD otherwise shows up as a huge bogus allocation deep inside the reader
+    if (header->numlumps <= 0 || header->infotableofs < (int32_t)sizeof(wadinfo_t) ||
+        (int64_t)header->infotableofs + (int64_t)header->numlumps * (int64_t)sizeof(filelump_t) > file_size) {
+        throw std::runtime_error(filename + ": the lump directory (" + std::to_string(header->numlumps) + " entries at offset " +
+                                 std::to_string(header->infotableofs) + ") doesn't fit in the file - the WAD is damaged or truncated");
+    }
     fseek(in, header->infotableofs, SEEK_SET);
     auto lumps_raw = read_raw<filelump_t>(in, header->numlumps);
     for(int i=0;i<(int)lumps_raw.size();i++) {
         auto lraw = lumps_raw.get(i);
+        if (lraw->size < 0 || lraw->filepos < 0 || (int64_t)lraw->filepos + (int64_t)lraw->size > file_size) {
+            int bad = 0;
+            for (int j = i; j < (int)lumps_raw.size(); j++) {
+                auto l = lumps_raw.get(j);
+                if (l->size < 0 || l->filepos < 0 || (int64_t)l->filepos + (int64_t)l->size > file_size) bad++;
+            }
+            throw std::runtime_error(filename + ": lump " + std::to_string(i) + " of " + std::to_string(lumps_raw.size()) +
+                                     " has an invalid position/size (" + std::to_string(lraw->filepos) + ", " +
+                                     std::to_string(lraw->size) + "); " + std::to_string(bad) +
+                                     " directory entries are bad - the WAD is damaged or truncated (re-copy it from the original)");
+        }
         std::string name = wad::wad_string(lraw->name);
         if (!lraw->size) {
             rc.lumps[i] = lump(name, std::vector<uint8_t>(), i);

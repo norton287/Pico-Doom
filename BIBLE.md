@@ -207,3 +207,9 @@ final test: flash and play.
   press->turn). Bluetooth scanning while connected halved the frame rate (~100ms vs ~50ms avg); scanning now
   stops once a controller is ready and resumes on disconnect. Taps restored to vanilla precision (first 2 tics
   at 320, then ramp 640->896 over 6 tics).
+- **2026-11-25** - whd_gen: validates the WAD header and every directory entry against the file size and names a
+  damaged/truncated WAD (lump number, how many entries are bad) instead of crashing with
+  "cannot create std::vector larger than max_size()". Found with a copy of Ultimate Doom whose last 1504 bytes
+  (94 flat directory entries) were corrupt; good WADs convert byte-identically. Tested WADs: shareware DOOM1 ->
+  1.8MB WHX; Doom II v1.9 -> 7.8MB WHD (needs a 16MB board, e.g. Pimoroni Pico Plus 2 W); Plutonia/TNT stop on
+  "Mismatch in anim textures" (upstream: not yet supported).
