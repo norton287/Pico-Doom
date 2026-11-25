@@ -468,11 +468,7 @@ void I_BindInputVariables(void)
     M_BindIntVariable("novert",                    &novert);
 }
 
-#if PICO_NO_HARDWARE
-#include "pico/scanvideo.h"
-#else
 #define WITH_SHIFT 0x8000
-#endif
 
 static void pico_key_down(int scancode, int keysym, int modifiers) {
     event_t event;
@@ -508,21 +504,12 @@ static void pico_key_up(int scancode, int keysym, int modifiers) {
     }
 }
 
-#if PICO_NO_HARDWARE
-static void pico_quit(void) {
-    exit(0);
-}
-#endif
 
 void I_InputInit(void) {
 #if PICO_BUTTON_INPUT
     I_ButtonsInit();
 #endif
-#if PICO_NO_HARDWARE
-    platform_key_down = pico_key_down;
-    platform_key_up = pico_key_up;
-    platform_quit = pico_quit;
-#elif USB_SUPPORT
+#if USB_SUPPORT
     tusb_init();
     irq_set_priority(USBCTRL_IRQ, 0xc0);
 #endif

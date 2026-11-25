@@ -355,10 +355,6 @@ void handle_exit_key_down(int scancode, bool shift, uint8_t *kb_buffer, int kb_l
         else if (!strcmp((char*)kb_buffer, "CLS")) {
             memset(text_screen_data, 0, 80 * 25 * 2);
             entry_line = 0;
-#if PICO_NO_HARDWARE
-            } else if (!strcmp((char*)kb_buffer, "exit")) {
-                exit(0);
-#endif
         } else if (!strcmp((char*)cmd, "CD")) {
             while (foo < kb_buffer + l && *foo == ' ') foo++;
             if (foo >= kb_buffer + l || !*foo) {

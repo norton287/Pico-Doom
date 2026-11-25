@@ -10,7 +10,8 @@ You can read many details on this port in the blog post [here](https://kilograha
 This fork only builds for the Pico (plus the native `whd_gen` WAD converter): the original PC (SDL) `chocolate-doom`
 build and the never-built Heretic / Hexen / Strife code have been removed (see `BIBLE.md`).
 
-This chocolate-doom commit that the code is branched off can be found in the `upstream` branch.
+The original project is [kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom); its `upstream` branch holds
+the chocolate-doom commit the code was branched off.
 
 The original Chocolate Doom README is [here](README-chocolate.md).
 
@@ -240,7 +241,7 @@ cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DPICO_BOARD=pico -DPICO_SDK_PATH=/path/to/p
 
 As before, use `make` or `make <target>` to build. 
 
-The RP2040 version has four targets, each of which create a similarly named `UF2` file (e.g. `doom_tiny.uf2`). 
+The RP2040 version has four targets (five on a Pico 2 W, see below), each of which create a similarly named `UF2` file (e.g. `doom_tiny.uf2`). 
 These UF2 files contain the executable code/data, but they do not contain the WAD data which is converted into a 
 RP2040 Domom 
 specific WHD/WHX format by `whd_gen` (for more see below). The WHD/WHX file must also be loaded onto the device at a 
@@ -268,6 +269,8 @@ binary would just have made things bigger and slower.
 * **doom_tiny_nost_usb** This is a "non super tiny" version of `doom_tiny_usb` supporting larger WADs stored as 
   WHD. The WHD
   file must be loaded at `0x10048000`
+* **doom_tiny_bt** (Pico 2 W only) `doom_tiny` plus Bluetooth gamepads; the WHX must be loaded at `0x10100000`. See
+  "Bluetooth gamepads (Pico 2 W)" above.
 
 You can load you WHD/WHX file using [picotool](https://github.com/raspberrypi/picotool). e.g.
 

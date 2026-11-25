@@ -236,12 +236,6 @@ target_compile_options(small_doom_common INTERFACE
         -Wno-unused-variable
         )
 
-if (TARGET chocolate-doom)
-    target_compile_definitions(chocolate-doom PRIVATE
-        USE_FLAT_MAX_256=1
-    )
-endif()
-
 set(DOOM_PICO_SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/pico)
 # WAD data to bundle into "<target>_wad.uf2" next to the plain program UF2 (so a single drag & drop installs
 # both). The super-tiny targets use WHX (doom1.whx, the shareware WAD, ships with this repo); the "nost" targets
@@ -453,16 +447,9 @@ target_compile_definitions(render_newhope INTERFACE
         PICO_SCANVIDEO_LINKED_SCANLINE_BUFFERS=1
         PICO_SCANVIDEO_SCANLINE_RELEASE_FUNCTION=1
         )
-if (PICO_ON_DEVICE)
-    target_compile_definitions(render_newhope INTERFACE
-            PICO_SCANVIDEO_MAX_SCANLINE_BUFFER_WORDS=164
-    )
-else()
-    # we cannot rewrite the buffers in host mode so we need them to be big enough for text mode
-    target_compile_definitions(render_newhope INTERFACE
-            PICO_SCANVIDEO_MAX_SCANLINE_BUFFER_WORDS=324
-    )
-endif()
+target_compile_definitions(render_newhope INTERFACE
+        PICO_SCANVIDEO_MAX_SCANLINE_BUFFER_WORDS=164
+)
 
 if (PICO_SDK)
     add_doom_tiny("" render_newhope)

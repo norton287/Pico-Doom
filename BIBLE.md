@@ -191,3 +191,7 @@ final test: flash and play.
   CMake/build.sh options and README VGA build/pin sections. The `PICO_SCANVIDEO_*` defines stay: the LCD code
   uses them to size its text buffers. All 17 binaries byte-identical again. Host (`PICO_PLATFORM=host` / pico_host_sdl)
   builds went with it: they used the VGA path, and the README section describing them was removed.
+- **2026-11-24** - Trim cleanup: removed the dead `PICO_NO_HARDWARE` (host) branches in `src/pico/i_input.c` /
+  `i_system.c`, the `chocolate-doom` and host-mode leftovers in `src/CMakeLists.txt`, and the broken `.lvimrc`
+  (it looked for autotools' `configure.in`); `build.sh -h` no longer prints a stray line; README lists
+  `doom_tiny_bt` and points to upstream for its `upstream` branch. Firmware byte-identical again.
