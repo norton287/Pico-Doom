@@ -505,19 +505,28 @@ if (PICO_SDK)
         add_compile_definitions(CYW43_PIO_CLOCK_DIV_INT=4 CYW43_PIO_CLOCK_DIV_FRAC8=0)
         add_subdirectory(${BLUEPAD32_ROOT}/src/components/bluepad32 libbluepad32)
 
-        set(DOOM_TINY_BLUETOOTH 1)
-        add_doom_tiny(_bt render_newhope)
-        set(DOOM_TINY_BLUETOOTH 0)
-        target_sources(doom_tiny_bt PRIVATE pico/i_bluetooth.c)
-        target_include_directories(doom_tiny_bt PRIVATE ${BLUEPAD32_ROOT}/src/components/bluepad32/include)
-        target_link_libraries(doom_tiny_bt PRIVATE tiny_settings bluepad32 pico_cyw43_arch_none pico_btstack_classic pico_btstack_ble pico_btstack_cyw43)
-        target_compile_definitions(doom_tiny_bt PRIVATE
-                PICO_BLUETOOTH_INPUT=1
-                # BTstack's pairing keys: the 8K below the last 4K sector of flash (RP2350 default) - keep saves clear
-                DOOM_FLASH_RESERVED_TOP=12288
-        )
-        # Bluetooth + the cyw43 firmware are ~500K, so the WHX moves up (Pico 2 W has 4MB)
-        set_doom_tiny_wad_addr(doom_tiny_bt 0x10100000 "${DOOM_BUNDLE_WHX}")
+        # doom_tiny_bt<SUFFIX>: doom_tiny + Bluetooth gamepads (shared by the plain and the USB variant)
+        function(add_doom_tiny_bt SUFFIX)
+            set(DOOM_TINY_BLUETOOTH 1)
+            add_doom_tiny(_bt${SUFFIX} render_newhope)
+            target_sources(doom_tiny_bt${SUFFIX} PRIVATE pico/i_bluetooth.c)
+            target_include_directories(doom_tiny_bt${SUFFIX} PRIVATE ${BLUEPAD32_ROOT}/src/components/bluepad32/include)
+            target_link_libraries(doom_tiny_bt${SUFFIX} PRIVATE tiny_settings bluepad32 pico_cyw43_arch_none pico_btstack_classic pico_btstack_ble pico_btstack_cyw43)
+            target_compile_definitions(doom_tiny_bt${SUFFIX} PRIVATE
+                    PICO_BLUETOOTH_INPUT=1
+                    # BTstack's pairing keys: the 8K below the last 4K sector of flash (RP2350 default) - keep saves clear
+                    DOOM_FLASH_RESERVED_TOP=12288
+            )
+            # Bluetooth + the cyw43 firmware are ~500K, so the WHX moves up (Pico 2 W has 4MB)
+            set_doom_tiny_wad_addr(doom_tiny_bt${SUFFIX} 0x10100000 "${DOOM_BUNDLE_WHX}")
+        endfunction()
+        add_doom_tiny_bt("")
+        if (PICO_ON_DEVICE)
+            # doom_tiny_bt_usb: the Bluetooth build plus USB host keyboard / mouse (via an OTG adapter)
+            add_doom_tiny_bt(_usb)
+            target_link_libraries(doom_tiny_bt_usb PRIVATE pico_cd)
+            target_compile_definitions(doom_tiny_bt_usb PRIVATE USB_SUPPORT=1)
+        endif()
     endif()
 endif()
 

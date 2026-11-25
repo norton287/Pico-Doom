@@ -241,7 +241,7 @@ cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DPICO_BOARD=pico -DPICO_SDK_PATH=/path/to/p
 
 As before, use `make` or `make <target>` to build. 
 
-The RP2040 version has four targets (five on a Pico 2 W, see below), each of which create a similarly named `UF2` file (e.g. `doom_tiny.uf2`). 
+The RP2040 version has four targets (six on a Pico 2 W, see below), each of which create a similarly named `UF2` file (e.g. `doom_tiny.uf2`). 
 These UF2 files contain the executable code/data, but they do not contain the WAD data which is converted into a 
 RP2040 Domom 
 specific WHD/WHX format by `whd_gen` (for more see below). The WHD/WHX file must also be loaded onto the device at a 
@@ -271,6 +271,8 @@ binary would just have made things bigger and slower.
   file must be loaded at `0x10048000`
 * **doom_tiny_bt** (Pico 2 W only) `doom_tiny` plus Bluetooth gamepads; the WHX must be loaded at `0x10100000`. See
   "Bluetooth gamepads (Pico 2 W)" above.
+* **doom_tiny_bt_usb** (Pico 2 W only) `doom_tiny_bt` plus USB keyboard/mouse through an OTG adapter (the Pico then
+  needs power from an OTG Y-cable or a powered hub); same WHX address `0x10100000`.
 
 You can load you WHD/WHX file using [picotool](https://github.com/raspberrypi/picotool). e.g.
 

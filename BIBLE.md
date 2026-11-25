@@ -20,7 +20,7 @@ ported to a **Pimoroni Pico Display Pack 2.0 / 2.8** (ST7789 320x240 SPI LCD + A
 ## 2. Build
 
 **What builds:** only Pico firmware (`doom_tiny`, `doom_tiny_nost`, `doom_tiny_usb`, `doom_tiny_nost_usb`, and
-`doom_tiny_bt` on a Pico 2 W) and the native `whd_gen` converter (`-DWHD_GEN_ONLY=ON`). The PC/SDL build,
+`doom_tiny_bt` + `doom_tiny_bt_usb` on a Pico 2 W) and the native `whd_gen` converter (`-DWHD_GEN_ONLY=ON`). The PC/SDL build,
 Heretic/Hexen/Strife, autotools and installer packaging, and the original VGA display output were removed on
 2026-11-24 (all firmware verified byte-identical before/after). `DOOM_DISPLAY` is `PIMORONI_DISPLAY_2` (default) or
 `PIMORONI_DISPLAY_28`. USB keyboard/mouse builds stay, on the SDK's TinyUSB. Configuring without the Pico SDK stops with a message saying so.
@@ -35,6 +35,7 @@ Toolchain on this box lives in `/opt/pico`:
 export PICO_SDK_PATH=/opt/pico/pico-sdk PICO_EXTRAS_PATH=/opt/pico/pico-extras
 export PATH=/opt/pico/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin:$PATH
 ./build.sh -b pico2_w -t doom_tiny_bt -D BLUEPAD32_ROOT=/opt/pico/bluepad32   # Bluetooth build
+./build.sh -b pico2_w -t doom_tiny_bt_usb -D BLUEPAD32_ROOT=/opt/pico/bluepad32  # Bluetooth + USB keyboard/mouse
 ./build.sh -b pico2_w -t doom_tiny    -D BLUEPAD32_ROOT=/opt/pico/bluepad32   # buttons only
 ```
 
@@ -46,7 +47,7 @@ Build options (Display Pack builds):
 
 | Option | Default | Effect |
 |---|---|---|
-| `DOOM_BLUETOOTH` | ON for `PICO_BOARD=pico2_w` | adds the `doom_tiny_bt` target |
+| `DOOM_BLUETOOTH` | ON for `PICO_BOARD=pico2_w` | adds the `doom_tiny_bt` and `doom_tiny_bt_usb` targets |
 | `DOOM_BUTTON_DEBUG` | OFF | top-right strip: raw buttons, chord state, and bars (black tick every 50px): green = longest gap between input polls (1px/ms); then cyan = longest frame, magenta = most queued ticcmds (20px/tic), white = turn press -> first turning ticcmd, yellow = average frame (all 1px/ms, last second) |
 | `DOOM_BT_DEBUG` | OFF | top-left Bluetooth strip (section 6) |
 | `DOOM_LCD_ASPECT_CORRECT` | ON | 320x200 stretched to 4:3; OFF = square pixels with bars |
@@ -103,6 +104,19 @@ in `src/pico/i_buttons.c`.
 **Pairing the 8BitDo Zero 2:** power on with **B + Start** (D-input / Android mode), then hold **Select 3s**
 until its LED blinks fast. LED solid = connected. The Zero 2 has no separate pair button. (Other 8BitDo pads:
 their pair button, 3s.)
+
+### Bluetooth + USB keyboard/mouse (`doom_tiny_bt_usb`)
+
+Same as `doom_tiny_bt` (shared CMake function `add_doom_tiny_bt` in `src/CMakeLists.txt`; same WHX address
+0x10100000, same save area, same pairing keys) plus `USB_SUPPORT=1` / `pico_cd` (TinyUSB host from the SDK):
+`tusb_init` in `I_InputInit` (USB IRQ priority 0xc0), `tuh_task()` on every input poll, a 2s wait for USB devices
+at boot, HID keyboard + mouse in `src/pico/i_input.c`. Zero 2, keyboard, mouse and the Display Pack buttons all
+feed the same Doom events, so every cheat can be typed. Cost: ~1.4KB less zone RAM than `doom_tiny_bt`
+(~228.6KB free vs ~230KB; plain doom_tiny ~268KB). `doom_tiny_bt` is kept unchanged as the proven fallback.
+
+Hardware: the micro-USB port becomes a USB host, so the Pico isn't powered from it any more - use an OTG
+Y-cable with power input, or an OTG adapter into a powered hub. Upstream warns some keyboards don't work (small
+TinyUSB host limits); Raspberry Pi keyboards are known good.
 
 ### Layouts
 
@@ -175,6 +189,12 @@ final test: flash and play.
 - Working on the owner's board (Pico 2 W, release build, 2026-11-24): Display Pack build, Bluetooth build,
   Zero 2 pairing, controls, turning, **save and load across a power cycle**, and the Zero 2 **reconnecting by
   itself** afterwards (saves don't disturb the pairing keys).
+- `doom_tiny_bt_usb`: built (no fit warnings, other 5 Pico 2 W firmwares byte-identical) and flashed to the owner's
+  board 2026-11-25; **Zero 2 confirmed working** on it. Still to test: USB keyboard/mouse via powered OTG, a
+  typed cheat, save/load.
+- Doom II (7.8MB WHD) and other full WADs need a 16MB board: the owner plans a Pimoroni Pico Plus 2 W, then add a
+  big-WAD Bluetooth build (`_nost` + Bluetooth). The owner's Ultimate Doom copy is damaged (needs a clean
+  DOOM.WAD); Plutonia/TNT aren't supported by whd_gen yet.
 - Repo: public **github.com/norton287/Pico-Doom**, remote `pico-doom`, branch `pimoroni-display-pack` pushed
   as `main`. `origin` = kilograham upstream, fetch only (push URL disabled). Licence GPL-2.0 (`COPYING.md`).
 - The README's main "Controls" table covers the Display Pack buttons; Bluetooth controls are summarised there and
@@ -213,3 +233,6 @@ final test: flash and play.
   (94 flat directory entries) were corrupt; good WADs convert byte-identically. Tested WADs: shareware DOOM1 ->
   1.8MB WHX; Doom II v1.9 -> 7.8MB WHD (needs a 16MB board, e.g. Pimoroni Pico Plus 2 W); Plutonia/TNT stop on
   "Mismatch in anim textures" (upstream: not yet supported).
+- **2026-11-25** - New `doom_tiny_bt_usb` target (Pico 2 W): the Bluetooth build plus USB host keyboard/mouse via
+  an OTG adapter. The Bluetooth target recipe moved into `add_doom_tiny_bt()`; `doom_tiny_bt` and the other
+  Pico 2 W firmwares stay byte-identical. Flashed; Zero 2 confirmed, USB keyboard test pending.
