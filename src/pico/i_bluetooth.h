@@ -41,6 +41,7 @@
 typedef struct {
     uint32_t seq;
     bool connected;
+    bool dpad_only; // no analog sticks (e.g. 8BitDo Zero): its d-pad arrives as the left stick
     uint8_t dpad;
     uint8_t misc;
     uint16_t buttons;
@@ -49,6 +50,35 @@ typedef struct {
 } bt_pad_state_t;
 
 extern volatile bt_pad_state_t bt_pad;
+
+// True if a report shows real analog hardware: a stick part way out, or the right stick / triggers in use.
+// A d-pad sent as a stick (8BitDo Zero 2) only ever reports centre or fully out.
+static inline bool bt_report_is_analog(int x, int y, int rx, int ry, int brake, int throttle) {
+    #define BT_PARTWAY(v) ((v) > BT_AXIS_MAX / 5 && (v) < BT_AXIS_MAX * 4 / 5)
+    #define BT_ABS(v) ((v) < 0 ? -(v) : (v))
+    bool analog = BT_PARTWAY(BT_ABS(x)) || BT_PARTWAY(BT_ABS(y)) ||
+                  BT_ABS(rx) > BT_AXIS_MAX / 4 || BT_ABS(ry) > BT_AXIS_MAX / 4 ||
+                  brake > BT_TRIGGER_MAX / 4 || throttle > BT_TRIGGER_MAX / 4;
+    #undef BT_PARTWAY
+    #undef BT_ABS
+    return analog;
+}
+
+// bring-up progress (for the on-screen status strip)
+enum {
+    BT_STAGE_NONE = 0,         // I_BluetoothInit not called yet
+    BT_STAGE_RADIO_INIT,       // inside cyw43_arch_init (stuck here = radio driver hang)
+    BT_STAGE_RADIO_FAILED,     // cyw43_arch_init returned an error
+    BT_STAGE_RADIO_OK,         // radio up, starting Bluepad32
+    BT_STAGE_STACK_STARTED,    // uni_init returned, waiting for BTstack to power up
+    BT_STAGE_SCANNING,         // BTstack up, scanning / autoconnecting
+};
+extern volatile uint8_t bt_debug_stage, bt_debug_heartbeat, bt_debug_discovered, bt_debug_connected, bt_debug_ready,
+        bt_debug_reports;
+extern volatile int8_t bt_debug_init_err;
+extern volatile uint8_t bt_debug_dpad_only;
+extern volatile uint8_t bt_debug_raw; // bit 0: left stick X out, 1: left stick Y out, 2: hat d-pad pressed, 3: right stick out
+extern volatile uint8_t bt_debug_inq_done, bt_debug_inq_result, bt_debug_adv, bt_debug_cmd_err, bt_debug_conn_req;
 
 // bring up the radio and Bluepad32 (call once core 1, sound and graphics are running)
 void I_BluetoothInit(void);

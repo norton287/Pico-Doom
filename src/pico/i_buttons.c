@@ -409,6 +409,7 @@ static bool RAM_FUNC(read_pad)(bt_pad_state_t *out) {
         __mem_fence_acquire();
         if (seq & 1u) continue;
         out->connected = bt_pad.connected;
+        out->dpad_only = bt_pad.dpad_only;
         out->dpad = bt_pad.dpad;
         out->misc = bt_pad.misc;
         out->buttons = bt_pad.buttons;
@@ -504,12 +505,26 @@ static void RAM_FUNC(pad_process)(uint32_t now) {
     uint8_t want = 0;
     if (pad_dirs & PAD_UP) want |= HELD_FORWARD;
     if (pad_dirs & PAD_DOWN) want |= HELD_BACK;
+    if ((p.buttons & (BT_BUTTON_RT | BT_BUTTON_X)) || p.throttle > TRIGGER_ON) want |= HELD_FIRE;
+    if ((p.buttons & (BT_BUTTON_LT | BT_BUTTON_B)) || p.brake > TRIGGER_ON) want |= HELD_RUN;
+    if (p.dpad_only) {
+        // d-pad only (8BitDo Zero 2): left/right turn, L/R strafe, Y next weapon, Select map
+        if (pad_dirs & PAD_LEFT) want |= HELD_LEFT;
+        if (pad_dirs & PAD_RIGHT) want |= HELD_RIGHT;
+        if (p.buttons & BT_BUTTON_LB) want |= HELD_STRAFE_LEFT;
+        if (p.buttons & BT_BUTTON_RB) want |= HELD_STRAFE_RIGHT;
+        pad_want = want;
+        if (pressed & BT_BUTTON_A) tap_key(key_use, now);
+        if (pressed & BT_BUTTON_Y) tap_key(key_nextweapon, now);
+        if (misc_pressed & BT_MISC_SELECT) tap_key(key_map_toggle, now);
+        if (misc_pressed & BT_MISC_START) tap_key(key_menu_activate, now);
+        return;
+    }
+    // twin stick: left stick moves and strafes, right stick (or d-pad left/right) turns
     if (pad_dirs & PAD_LS_LEFT) want |= HELD_STRAFE_LEFT;
     if (pad_dirs & PAD_LS_RIGHT) want |= HELD_STRAFE_RIGHT;
     if ((p.dpad & BT_DPAD_LEFT) || (pad_dirs & PAD_RS_LEFT)) want |= HELD_LEFT;
     if ((p.dpad & BT_DPAD_RIGHT) || (pad_dirs & PAD_RS_RIGHT)) want |= HELD_RIGHT;
-    if ((p.buttons & (BT_BUTTON_RT | BT_BUTTON_X)) || p.throttle > TRIGGER_ON) want |= HELD_FIRE;
-    if ((p.buttons & (BT_BUTTON_LT | BT_BUTTON_B)) || p.brake > TRIGGER_ON) want |= HELD_RUN;
     pad_want = want;
 
     if (pressed & BT_BUTTON_A) tap_key(key_use, now);

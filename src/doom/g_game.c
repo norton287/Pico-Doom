@@ -225,6 +225,13 @@ static const struct
 };
 
 #define SLOWTURNTICS	6 
+#if PICO_BUTTON_INPUT
+// Display Pack buttons / Bluetooth d-pads (no analog turn): turning starts at walking speed and accelerates
+// smoothly over this many tics to TURN_MAX (or to running speed while run is held, for quick spins).
+// The screen lags the game by a frame or two, so overshoot grows with the speed you let go at.
+#define TURN_RAMP_TICS	8
+#define TURN_MAX	896
+#endif
  
 #define NUMKEYS		256 
 #define MAX_JOY_BUTTONS 20
@@ -376,6 +383,7 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
     boolean	bstrafe; 
     int		speed;
     int		tspeed; 
+    int		turnamount;
     int		forward;
     int		side;
 
@@ -420,10 +428,22 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
     else 
 	turnheld = 0; 
 
+#if PICO_BUTTON_INPUT
+    // buttons / d-pads: a tap turns a little (walking speed, fine aim); holding accelerates evenly to
+    // TURN_MAX, or to running speed with run held. Big fixed steps felt jerky and overshot.
+    {
+        int top = speed ? angleturn[1] : TURN_MAX;
+        int ramp = turnheld > 1 ? turnheld - 1 : 0;
+        if (ramp > TURN_RAMP_TICS) ramp = TURN_RAMP_TICS;
+        turnamount = angleturn[0] + (top - angleturn[0]) * ramp / TURN_RAMP_TICS;
+    }
+#else
     if (turnheld < SLOWTURNTICS) 
 	tspeed = 2;             // slow turn 
     else 
 	tspeed = speed;
+    turnamount = angleturn[tspeed];
+#endif
     
     // let movement keys cancel each other out
     if (strafe) 
@@ -449,14 +469,14 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
     else 
     { 
 	if (is_gamekeydown(key_right))
-	    cmd->angleturn -= angleturn[tspeed]; 
+	    cmd->angleturn -= turnamount; 
 	if (is_gamekeydown(key_left))
-	    cmd->angleturn += angleturn[tspeed];
+	    cmd->angleturn += turnamount;
 #if !NO_USE_JOYSTICK
 	if (joyxmove > 0)
-	    cmd->angleturn -= angleturn[tspeed]; 
+	    cmd->angleturn -= turnamount; 
 	if (joyxmove < 0) 
-	    cmd->angleturn += angleturn[tspeed]; 
+	    cmd->angleturn += turnamount; 
 #endif
     }
 

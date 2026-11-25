@@ -83,6 +83,17 @@ For **every** cheat (`IDCLIP`, `IDCLEV`, `IDBEHOLD`...) and anything else needin
 the `*_usb` builds accept a USB keyboard, and all builds accept keys from
 [SDL Event Forwarder](https://github.com/kilograham/sdl_event_forwarder) over UART0 (GP0 TX / GP1 RX, 115200).
 
+### Bluetooth gamepads (Pico 2 W)
+
+`./build.sh -b pico2_w -t doom_tiny_bt` builds **`doom_tiny_bt_wad.uf2`**, which also accepts Bluetooth gamepads via
+[Bluepad32](https://github.com/ricardoquesada/bluepad32) (8BitDo, PlayStation, Switch, Xbox...). Put the controller in
+pairing mode after Doom has started; the Pico 2 W's LED lights while one is connected, and paired controllers reconnect
+by themselves. An 8BitDo Zero 2 pairs with **B + Start** to power on, then **Select** held 3s.
+
+D-pad-only pads (e.g. 8BitDo Zero 2): d-pad moves / turns, **L / R** strafe, **X** fire, **A** use, **B** run,
+**Y** next weapon, **Select** automap, **Start** menu. Twin-stick pads: left stick moves / strafes, right stick turns,
+RT fire, A use, LT/B run, LB/RB weapons. See `BIBLE.md` for details.
+
 ### Pins (Display Pack builds)
 
 ```

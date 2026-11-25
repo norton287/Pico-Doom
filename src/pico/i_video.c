@@ -47,6 +47,9 @@
 #include "st7789_lcd.h"
 #if PICO_BUTTON_INPUT
 #include "i_buttons.h"
+#if PICO_BLUETOOTH_INPUT
+#include "i_bluetooth.h"
+#endif
 #include "hardware/structs/sio.h"
 #endif
 #include "hardware/irq.h"
@@ -1179,6 +1182,36 @@ static void __not_in_flash_func(lcd_render_scanline)(uint32_t *dest, int scanlin
         if (gap > SCREENWIDTH) gap = SCREENWIDTH;
         uint16_t *d = (uint16_t *) dest;
         for (uint i = 0; i < gap; i++) d[i] = c;
+    }
+#endif
+#if PICO_BLUETOOTH_INPUT && DOOM_BT_DEBUG
+    // Bluetooth bring-up strip, top left: [stage][heartbeat][discovered][connected][ready][reports]
+    // stage: grey not started, yellow radio init, red radio failed, blue radio ok, magenta stack starting,
+    // green scanning. The others are dark until their counter moves, then change colour on every step.
+    if (scanline >= 2 && scanline < 10) {
+        static const uint16_t stage_col[6] = {0x8410, 0xFFE0, 0xF800, 0x001F, 0xF81F, 0x07E0};
+        static const uint16_t cyc[4] = {0xF800, 0xFFE0, 0x07FF, 0xF81F};
+        // then a gap and, from raw radio traffic: [scan cycles][classic devices][BLE adverts][rejected cmds][incoming]
+        uint8_t counts[10] = {bt_debug_heartbeat, bt_debug_discovered, bt_debug_connected, bt_debug_ready, bt_debug_reports,
+                              bt_debug_inq_done, bt_debug_inq_result, bt_debug_adv, bt_debug_cmd_err, bt_debug_conn_req};
+        uint8_t stage = bt_debug_stage;
+        uint16_t *d = (uint16_t *) dest;
+        for (int b = 0; b < 11; b++) {
+            uint16_t c = b == 0 ? stage_col[stage < 6 ? stage : 0]
+                                : (counts[b - 1] ? cyc[(counts[b - 1] - 1u) & 3u] : 0x2104);
+            if (b == 4 && bt_debug_ready && bt_debug_dpad_only) c = 0x07E0; // green: d-pad only layout
+            uint16_t *p = d + b * 8 + (b >= 6 ? 8 : 0);
+            for (int i = 0; i < 6; i++) p[i] = c;
+            p[6] = p[7] = 0;
+        }
+        // then what the controller is sending right now (white = yes): [left X][left Y][hat d-pad][right X]
+        uint8_t raw = bt_debug_raw;
+        for (int b = 0; b < 4; b++) {
+            uint16_t c = (raw >> b) & 1u ? 0xFFFF : 0x2104;
+            uint16_t *p = d + (11 + b) * 8 + 16;
+            for (int i = 0; i < 6; i++) p[i] = c;
+            p[6] = p[7] = 0;
+        }
     }
 #endif
 }
