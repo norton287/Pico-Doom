@@ -21,8 +21,9 @@ ported to a **Pimoroni Pico Display Pack 2.0 / 2.8** (ST7789 320x240 SPI LCD + A
 
 **What builds:** only Pico firmware (`doom_tiny`, `doom_tiny_nost`, `doom_tiny_usb`, `doom_tiny_nost_usb`, and
 `doom_tiny_bt` on a Pico 2 W) and the native `whd_gen` converter (`-DWHD_GEN_ONLY=ON`). The PC/SDL build,
-Heretic/Hexen/Strife, autotools and installer packaging were removed on 2026-11-24 (all firmware verified
-byte-identical before/after). Configuring without the Pico SDK stops with a message saying so.
+Heretic/Hexen/Strife, autotools and installer packaging, and the original VGA display output were removed on
+2026-11-24 (all firmware verified byte-identical before/after). `DOOM_DISPLAY` is `PIMORONI_DISPLAY_2` (default) or
+`PIMORONI_DISPLAY_28`. USB keyboard/mouse builds stay, on the SDK's TinyUSB. Configuring without the Pico SDK stops with a message saying so.
 The Pico build still uses `opl/` (music synth), `src/adpcm-xq` (sound compression) and
 `textscreen/fonts/normal.h` (the quit-screen font) from the inherited tree.
 
@@ -185,3 +186,7 @@ final test: flash and play.
   (setup, textscreen except its font, pcsound, midiproc, SDL platform/net sources, OPL PC backends, win32, man,
   data, packaging), autotools, Travis, stale scripts/images and the unused TinyUSB submodule (USB builds use
   the SDK's TinyUSB). All 17 firmware binaries byte-identical to before.
+- **2026-11-24** - Trim stage 2: removed the VGA (vgaboard / scanvideo) display path - `video_doom.pio`, the
+  non-LCD half of `src/pico/i_video.c` (-528 lines, resolved with `unifdef -DPICO_DOOM_LCD=1`), the VGA
+  CMake/build.sh options and README VGA build/pin sections. The `PICO_SCANVIDEO_*` defines stay: the LCD code
+  uses them to size its text buffers. All 17 binaries byte-identical again.

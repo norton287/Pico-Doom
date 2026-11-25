@@ -44,33 +44,28 @@ endif()
 
 target_link_libraries(common_pico INTERFACE pico_stdlib pico_multicore)
 
-if (DOOM_DISPLAY_IS_LCD)
-    # ST7789 SPI LCD + A/B/X/Y buttons (Pimoroni Pico Display Pack 2.0 / 2.8)
-    if (NOT PICO_ON_DEVICE)
-        message(FATAL_ERROR "DOOM_DISPLAY=${DOOM_DISPLAY} is only supported for on-device builds")
-    endif()
-    target_sources(common_pico INTERFACE
-            ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.c
-            ${CMAKE_CURRENT_LIST_DIR}/i_buttons.c
-    )
-    pico_generate_pio_header(common_pico ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.pio)
-    target_compile_definitions(common_pico INTERFACE
-            PICO_DOOM_LCD=1
-            PICO_BUTTON_INPUT=1
-    )
-    option(DOOM_BUTTON_DEBUG "Draw raw button / chord state in the top right corner of the LCD" OFF)
-    if (DOOM_BUTTON_DEBUG)
-        target_compile_definitions(common_pico INTERFACE DOOM_BUTTON_DEBUG=1)
-    endif()
-    option(DOOM_BT_DEBUG "Draw Bluetooth bring-up / controller state in the top left corner of the LCD (doom_tiny_bt)" OFF)
-    if (DOOM_BT_DEBUG)
-        target_compile_definitions(common_pico INTERFACE DOOM_BT_DEBUG=1)
-    endif()
-    target_link_libraries(common_pico INTERFACE hardware_pio hardware_dma)
-else()
-    pico_generate_pio_header(common_pico ${CMAKE_CURRENT_LIST_DIR}/video_doom.pio)
-    target_link_libraries(common_pico INTERFACE pico_scanvideo_dpi)
+# ST7789 SPI LCD + A/B/X/Y buttons (Pimoroni Pico Display Pack 2.0 / 2.8)
+if (NOT PICO_ON_DEVICE)
+    message(FATAL_ERROR "DOOM_DISPLAY=${DOOM_DISPLAY} is only supported for on-device builds")
 endif()
+target_sources(common_pico INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.c
+        ${CMAKE_CURRENT_LIST_DIR}/i_buttons.c
+)
+pico_generate_pio_header(common_pico ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.pio)
+target_compile_definitions(common_pico INTERFACE
+        PICO_DOOM_LCD=1
+        PICO_BUTTON_INPUT=1
+)
+option(DOOM_BUTTON_DEBUG "Draw raw button / chord state in the top right corner of the LCD" OFF)
+if (DOOM_BUTTON_DEBUG)
+    target_compile_definitions(common_pico INTERFACE DOOM_BUTTON_DEBUG=1)
+endif()
+option(DOOM_BT_DEBUG "Draw Bluetooth bring-up / controller state in the top left corner of the LCD (doom_tiny_bt)" OFF)
+if (DOOM_BT_DEBUG)
+    target_compile_definitions(common_pico INTERFACE DOOM_BT_DEBUG=1)
+endif()
+target_link_libraries(common_pico INTERFACE hardware_pio hardware_dma)
 
 add_library(pico_cd INTERFACE)
 if (TARGET tinyusb_host)

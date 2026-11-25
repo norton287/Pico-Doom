@@ -129,7 +129,7 @@ Saved games use whatever flash is left after the WHD; the flash size is detected
 
 | CMake option | Default | Meaning |
 |---|---|---|
-| `DOOM_DISPLAY` | `PIMORONI_DISPLAY_2` (`VGA` for `vgaboard`) | `PIMORONI_DISPLAY_2`, `PIMORONI_DISPLAY_28` or `VGA` |
+| `DOOM_DISPLAY` | `PIMORONI_DISPLAY_2` | `PIMORONI_DISPLAY_2` or `PIMORONI_DISPLAY_28` (the original VGA output has been removed) |
 | `DOOM_LCD_ASPECT_CORRECT` | `ON` | stretch 320x200 to 320x240 (4:3) vs. 1:1 with bars |
 | `DOOM_LCD_SPI_HZ` | `62500000` | max LCD SPI clock (in spec). At 270MHz this gives 45MHz, ~37 LCD fps; `67500000` gives 67.5MHz, ~55 fps, slightly over spec |
 | `DOOM_LCD_ROTATE_180` | `OFF` | flip the picture |
@@ -167,16 +167,9 @@ convert/compress WADs
 who's code is 
 likely completely incomprehensible!  
 
-## Artifacts
-
-You can find a RP2040 Doom UF2s based on the standard VGA/I2S pins in the 
-releases of this repository. There are also versions with the shareware DOOM1.WAD already embedded.
-
-Note you can always use `picotool info -a <UF2 file>` to see the pins used by a particular build.
-
 ## Goals
 
-The main goals for this port were:
+The original rp2040-doom's goals (it drove a VGA monitor; this fork drives a Display Pack LCD instead) were:
 
 1. Everything should match the original game experience, i.e. all the graphics at classic 320x200 resolution, stereo
    sound,
@@ -233,20 +226,17 @@ the `develop` branch of `pico-sdk`, so I recommend that..
 
 **NOTE: I am building with arm-none-eabi-gcc 13.2.rel1 .. whilst other versions may work, changes in compiler version may affect the binary size which, being tight, can cause problems (either link failure, or you may see stack overflow in the form of color palette corruption). Particularly I know tjhat arm-none-eabi-gcc 10.x versions don't work well.**
 
-For USB keyboard input support, RP2040 Doom currently uses a modified version of TinyUSB included as a submodule. 
-Make sure you have initialized this submodule via `git submodule update --init` 
+USB keyboard/mouse support (the `*_usb` targets) uses the TinyUSB bundled with the Pico SDK.
 
 You can create a build directly like this:
 
 ```bash
 mkdir rp2040-build
 cd rp2040-build
-cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DPICO_BOARD=vgaboard -DPICO_SDK_PATH=/path/to/pico-sdk -DPICO_EXTRAS_PATH=/path/to/pico-extras ..
+cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DPICO_BOARD=pico -DPICO_SDK_PATH=/path/to/pico-sdk -DPICO_EXTRAS_PATH=/path/to/pico-extras ..
 ```
 
-Note that the `PICO_BOARD` setting is for the standard VGA demo board which has RGB on pins 0->15, sync pins on 16,17 
-and 
-I2S on 26,27,28.
+(`./build.sh` does this for you.) Use `PICO_BOARD=pico2` / `pico2_w` for RP2350 boards.
 
 As before, use `make` or `make <target>` to build. 
 
@@ -339,31 +329,7 @@ deliberately lowers the encoding quality for the sake of speed.
 
 # Running the RP2040 version
 
-The releases here use pins as defined when building with `PICO_BOARD=vgaboard`:
-
-```
- 0-4:    Red 0-4
- 6-10:   Green 0-4
- 11-15:  Blue 0-4
- 16:     HSync
- 17:     VSync
- 18:     I2C1 SDA
- 19:     I2C1 SCL
- 20:     UART1 TX
- 21:     UART1 RX
- 26:     I2S DIN
- 27:     I2S BCK
- 28:     I2S LRCK
-```
-You can always find these from your ELF or UF2 with 
-
-```
-picotool info -a <filename>
-``` 
-
-These match for example the Pimoroni Pico VGA Demo Base which itself is based on the suggested 
-Raspberry Pi Documentation [here](https://datasheets.raspberrypi.com/rp2040/hardware-design-with-rp2040.pdf)
-and the design files zipped [here](https://datasheets.raspberrypi.com/rp2040/VGA-KiCAD.zip).
+See "Quick start" and "Pins (Display Pack builds)" above. `picotool info -a <uf2/elf>` lists the pins any build uses.
 
 # Future
 

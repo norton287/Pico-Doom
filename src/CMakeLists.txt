@@ -267,13 +267,9 @@ function(set_doom_tiny_wad_addr TARGET ADDR WAD_FILE)
     endif()
 endfunction()
 
-# core 1's stack lives in the 4K SCRATCH_X bank alongside VGA scanline code; the LCD builds don't put
-# their scanline code there, so give core 1 (which also takes the LCD interrupts) more headroom
-if (DOOM_DISPLAY_IS_LCD)
-    set(DOOM_CORE1_STACK_SIZE 0xc00)
-else()
-    set(DOOM_CORE1_STACK_SIZE 0x4f8)
-endif()
+# core 1's stack lives in the 4K SCRATCH_X bank; the LCD scanline code isn't there, so core 1 (which also
+# takes the LCD interrupts) gets most of it
+set(DOOM_CORE1_STACK_SIZE 0xc00)
 
 function(add_doom_tiny SUFFIX RENDER_LIB)
     add_executable(doom_tiny${SUFFIX})
@@ -386,48 +382,40 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
     endif()
     target_link_libraries(doom_tiny${SUFFIX} PRIVATE ${RENDER_LIB})
     if (PICO_SDK)
-        if (DOOM_DISPLAY_IS_LCD)
-            # Pimoroni Pico Display Pack: LCD on GP16-20, buttons on GP12-15, so I2C networking moves to GP2/GP3
+        # Pimoroni Pico Display Pack: LCD on GP16-20, buttons on GP12-15, so I2C networking moves to GP2/GP3
+        target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+                PICO_DEFAULT_I2C_SDA_PIN=2
+                PICO_DEFAULT_I2C_SCL_PIN=3
+                LCD_PIN_DC=16
+                LCD_PIN_CS=17
+                LCD_PIN_SCK=18
+                LCD_PIN_MOSI=19
+                LCD_PIN_BL=20
+                BUTTON_PIN_A=12
+                BUTTON_PIN_B=13
+                BUTTON_PIN_X=14
+                BUTTON_PIN_Y=15
+                LCD_SPI_HZ=${DOOM_LCD_SPI_HZ}
+                LCD_ASPECT_CORRECT=$<BOOL:${DOOM_LCD_ASPECT_CORRECT}>
+                LCD_ROTATE_180=$<BOOL:${DOOM_LCD_ROTATE_180}>
+        )
+        if (DOOM_DISPLAY STREQUAL "PIMORONI_DISPLAY_28")
+            # the 2.8" pack's RGB LED sits on GP26-28 where I2S audio normally lives, so move audio to GP9-11
             target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
-                    PICO_DEFAULT_I2C_SDA_PIN=2
-                    PICO_DEFAULT_I2C_SCL_PIN=3
-                    LCD_PIN_DC=16
-                    LCD_PIN_CS=17
-                    LCD_PIN_SCK=18
-                    LCD_PIN_MOSI=19
-                    LCD_PIN_BL=20
-                    BUTTON_PIN_A=12
-                    BUTTON_PIN_B=13
-                    BUTTON_PIN_X=14
-                    BUTTON_PIN_Y=15
-                    LCD_SPI_HZ=${DOOM_LCD_SPI_HZ}
-                    LCD_ASPECT_CORRECT=$<BOOL:${DOOM_LCD_ASPECT_CORRECT}>
-                    LCD_ROTATE_180=$<BOOL:${DOOM_LCD_ROTATE_180}>
+                    LCD_PIN_LED_R=26
+                    LCD_PIN_LED_G=27
+                    LCD_PIN_LED_B=28
+                    PICO_AUDIO_I2S_DATA_PIN=9
+                    PICO_AUDIO_I2S_CLOCK_PIN_BASE=10
             )
-            if (DOOM_DISPLAY STREQUAL "PIMORONI_DISPLAY_28")
-                # the 2.8" pack's RGB LED sits on GP26-28 where I2S audio normally lives, so move audio to GP9-11
-                target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
-                        LCD_PIN_LED_R=26
-                        LCD_PIN_LED_G=27
-                        LCD_PIN_LED_B=28
-                        PICO_AUDIO_I2S_DATA_PIN=9
-                        PICO_AUDIO_I2S_CLOCK_PIN_BASE=10
-                )
-            else()
-                target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
-                        LCD_PIN_LED_R=6
-                        LCD_PIN_LED_G=7
-                        LCD_PIN_LED_B=8
-                        # same I2S pins as the original vgaboard builds
-                        PICO_AUDIO_I2S_DATA_PIN=26
-                        PICO_AUDIO_I2S_CLOCK_PIN_BASE=27
-                )
-            endif()
         else()
-            # vgaboard
             target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
-                    PICO_DEFAULT_I2C_SDA_PIN=18
-                    PICO_DEFAULT_I2C_SCL_PIN=19
+                    LCD_PIN_LED_R=6
+                    LCD_PIN_LED_G=7
+                    LCD_PIN_LED_B=8
+                    # same I2S pins as the original rp2040-doom VGA board builds
+                    PICO_AUDIO_I2S_DATA_PIN=26
+                    PICO_AUDIO_I2S_CLOCK_PIN_BASE=27
             )
         endif()
     endif()
@@ -509,9 +497,6 @@ if (PICO_SDK)
 
     if (DOOM_BLUETOOTH)
         # doom_tiny_bt: doom_tiny (DOOM1.WAD as WHX) + Bluetooth gamepads via Bluepad32, for the Pico 2 W
-        if (NOT DOOM_DISPLAY_IS_LCD)
-            message(FATAL_ERROR "DOOM_BLUETOOTH currently requires a Display Pack build (DOOM_DISPLAY=PIMORONI_DISPLAY_2/28)")
-        endif()
         if (NOT BLUEPAD32_ROOT)
             include(FetchContent)
             FetchContent_Declare(bluepad32

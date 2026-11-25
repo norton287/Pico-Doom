@@ -5,7 +5,6 @@
 #   ./build.sh                          Raspberry Pi Pico (RP2040) + Pimoroni Pico Display Pack 2.0
 #   ./build.sh -b pico2                 Raspberry Pi Pico 2 (RP2350) + Display Pack 2.0
 #   ./build.sh -d PIMORONI_DISPLAY_28   Display Pack 2.8 instead
-#   ./build.sh -b vgaboard -d VGA       the original VGA demo-board build
 #   ./build.sh -b pimoroni_pico_plus2_rp2350 -w doom.whd   16MB board, bundle a full-game WHD
 #   ./build.sh -t doom_tiny             build just one target
 #
@@ -39,7 +38,7 @@ while getopts "b:d:w:t:j:D:h" opt; do
 done
 
 if [[ -z "$display" ]]; then
-    [[ "$board" == vgaboard ]] && display=VGA || display=PIMORONI_DISPLAY_2
+    display=PIMORONI_DISPLAY_2
 fi
 
 if ! command -v arm-none-eabi-gcc >/dev/null 2>&1 && [[ -z "${PICO_TOOLCHAIN_PATH:-}" ]]; then
